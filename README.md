@@ -1,8 +1,91 @@
 # BattleMind
 
-A local Pokémon Showdown player and experiment harness. **V1–V4:** legal battles, transparent Gen 1 policies, audited opponent-choice data, and frozen count/logistic switch prediction that influences shared action scoring. V4 trains logistic regression from validated local recorded battles on CPU. External replay ingestion, self-play learning, frontend, hosted services, API keys and GPUs are not required or implemented.
+A local Pokémon Showdown player and experiment harness. **V1–V6:** legal battles, transparent Gen 1 policies, audited opponent-choice data, frozen prediction, bounded policy learning, and cross-encounter adjustment from an individual synthetic opponent's prior public behavior. Everything runs locally on CPU. External replay ingestion, human profiling, frontend, hosted services, API keys and GPUs are not required or implemented.
 
 The central experiment is whether opponent prediction improves the **same** decision-making system. V4 compares a trained classifier with constant and conditional frequencies fitted on the same training rows. Probability quality and battle wins are separate outcomes. See [actual results](docs/STATUS.md) and the preserved [negative V3 findings](docs/MILESTONE3.md).
+
+## V6 public opponent memory
+
+**Implemented and tested; full acceptance is incomplete.** The single declared run
+stopped at its development budget after **96/96 requested games completed**, with
+zero battle failures or invalid actions. It did not finish the 144-game development
+schedule and launched **zero final games**. Individual memory reduced development
+Brier error but this partial, one-group result does not establish a final benefit.
+The unused final allocation was preserved; no retry or budget expansion occurred.
+See [STATUS.md](docs/STATUS.md) for actual results and timing/reporting limitations.
+
+V6 preserves the original V4 predictor and selected V5 scoring checkpoint. It
+compares no memory, pooled history and individual history using the **same scoring
+code and parameters**. Each arm uses only its own earlier completed encounters;
+memory is frozen within a battle. Public announcements are a conservative proxy,
+with forced, ambiguous, engine and missing evidence retained as exclusions.
+
+[V6-EXPERIMENT.md](docs/V6-EXPERIMENT.md) specifies 144 development and 576 final
+games, 900 seconds maximum, four fresh final reset groups, two unchanged target
+policies and four unchanged teams. It is one single-use experiment: no retry,
+resume, borrowing final budget, new self-play training or final-result tuning.
+
+```powershell
+. .\scripts\env.ps1
+# Actual one-time collection command already run; stopped on development budget:
+.\.venv\Scripts\python.exe -m battlemind adaptation-run --output runs/v6-acceptance
+# Read-only replay of memory, shadow predictions, choices and private label audits:
+.\.venv\Scripts\python.exe -m battlemind adaptation-report --experiment runs/v6-acceptance --audit
+```
+
+Do not rerun collection: this output is consumed, resume is unsupported, and a
+separate request is required for another experiment. The read-only audit verifies
+1,064 artifact files and 96 encounter replays, while returning exit code 1 because
+the overall experiment is incomplete. `audit.ok` does not mean acceptance passed.
+
+Collection output must be new. Required retained inputs are `models/v4-supervised.json`
+and `runs/v5-acceptance/selected.json`; missing or incompatible files stop before
+collection. Their exact hashes, regeneration limitations and code explanation are
+in [ADAPTATION.md](docs/ADAPTATION.md). A source-only clone does not contain these
+ignored artifacts. V5 evidence is preserved in [MILESTONE5.md](docs/MILESTONE5.md).
+The four planned final groups would give limited uncertainty evidence; none ran.
+Adaptation is not assumed to improve either probability quality or wins.
+
+## V5 bounded policy learning
+
+V4 improved probabilities without establishing a battle benefit; its full status is
+preserved in [MILESTONE4.md](docs/MILESTONE4.md). V5 freezes that predictor and learns
+four bounded score parameters: anticipation strength, healing preference, status
+preference and voluntary-switch threshold. Zero initialization exactly reproduces
+V4. Only completed-game outcomes from training can update these parameters.
+Selection uses fresh games; final evaluation uses frozen checkpoints.
+
+[V5-EXPERIMENT.md](docs/V5-EXPERIMENT.md) was written before training: two rounds,
+840 requested games, 20-minute maximum, concurrency 1, four unchanged teams.
+The accepted run is retained under `runs/v5-acceptance`: 840/840 games completed,
+two nonzero updates, 436.64s including the first offline audit. Selected c1 won
+104/144 final games versus c0's 98/144; the reward-difference interval includes
+regression, so improvement remains inconclusive. Do not repeat it to pursue a
+better result. Resume is unsupported and existing output directories are rejected.
+
+```powershell
+. .\scripts\env.ps1
+# Entire declared training -> selection -> frozen final evaluation, once only:
+.\.venv\Scripts\python.exe -m battlemind policy-train --output runs/v5-acceptance --predictor models/v4-supervised.json
+# Read-only report and reconstruction of updates, selection, decisions and labels:
+.\.venv\Scripts\python.exe -m battlemind policy-report --experiment runs/v5-acceptance --audit
+```
+
+The following are interfaces for a separately budgeted future use, not extra
+acceptance runs. Both load safe, frozen JSON and cannot perform learning:
+
+```powershell
+. .\scripts\env.ps1
+.\.venv\Scripts\python.exe -m battlemind battle --start-server --config configs/milestone2.json --agent-a learned-score --agent-b gen1-heuristic --predictor models/v4-supervised.json --checkpoint-a runs/v5-acceptance/selected.json --battles 24 --output runs/NEW_FROZEN_BATTLE
+.\.venv\Scripts\python.exe -m battlemind policy-evaluate --checkpoint runs/v5-acceptance/selected.json --predictor models/v4-supervised.json --opponent gen1-heuristic --battles 24 --output runs/NEW_FROZEN_EVALUATION
+```
+
+For a learned opponent, use `--agent-b learned-score --checkpoint-b PATH` in
+`battle`, or `--opponent learned-score --opponent-checkpoint PATH` in
+`policy-evaluate`. The original V4 artifact is required by the fixed training
+specification and remains ignored; a source-only clone cannot recreate its exact
+content hash from unspecified data. See [POLICY-LEARNING.md](docs/POLICY-LEARNING.md)
+for code paths, checkpoint compatibility, method limitations and interview notes.
 
 ## V4 supervised workflow
 
@@ -122,12 +205,13 @@ Milestone 2 enables official challenge end logs. Managed battles place these und
 
 `configs/smoke.json` has small defaults: 2 battles, concurrency 1, a 300-turn cap, 60 seconds per match, and 600 seconds for the run (including server startup). CLI options override that file: `--agent-a`, `--agent-b`, `--battles`, `--seed`, `--output`, `--concurrency`, `--turn-cap`, `--timeout`, `--run-timeout`, `--port`, `--showdown`, and `--config`. Team paths are configurable in JSON. Paths in the config are relative to the project directory, or absolute.
 
-Only concurrency **1** and `gen1ou` are supported. Unsupported values fail explicitly. Hard limits are 100 battles, 1,000 turns, 300 seconds per match, and 3,600 seconds per run. Raising budgets or adding concurrency requires a deliberate future change. There are no training loops.
+Only concurrency **1** and `gen1ou` are supported. Unsupported values fail explicitly. Hard limits are 100 battles, 1,000 turns, 300 seconds per match, and 3,600 seconds per run. Raising budgets or adding concurrency requires a deliberate future change. V5's sole policy-learning command additionally enforces its smaller fixed phase and aggregate allocations.
 
 - **RandomLegalAgent:** samples uniformly from actual request-backed legal actions using its own seeded `random.Random`.
 - **MaxBasePowerAgent:** selects the ordinary legal move with the highest Gen 1 listed base power. Ties use request order, even when all powers are zero. Fixed-damage moves use their listed value (e.g. Seismic Toss is 1), not calculated damage. When no ordinary move is offered, it uses the first engine action if available, otherwise the first legal original team slot. It ignores accuracy, STAB, matchups, survival, and strategy; it often chooses Explosion or Self-Destruct.
 - **Gen1HeuristicAgent** (`gen1-heuristic`): scores power, nominal accuracy, STAB and type matchup, with explicit healing, status, setup, recharge, and self-KO rules. It switches only for a substantial improvement in visible matchup/health utility, with a two-turn cooldown; forced replacements use the best bench utility. Scores are arbitrary utility, not damage or win probability. All weights, ties and limitations are explained in [docs/HEURISTIC.md](docs/HEURISTIC.md), and each candidate score is logged.
 - **SwitchAwareAgent** (`switch-constant` / `switch-context`): weights each damaging move's V2 utility against the current foe and possible switch destinations by a frozen switch probability. Both names use exactly the same scoring code. Revealed living bench Pokémon and anonymous unseen alternatives get equal destination weight; anonymous alternatives have neutral type utility. Status, healing and our switching rules retain V2 scores. This is an approximation, not a second simulator.
+- **LearnedScoreAgent** (`learned-score`): starts with unchanged V4 logistic scores and applies four frozen, bounded score parameters. It retains forced replacements, engine actions, raw HP precision, unknown fields and request-backed legality. Training may change parameters only between complete batches; ordinary battles and evaluation cannot update them.
 
 The schedule traverses unordered team pairs in four-game blocks: both assignments on both challenger sides. Four teams require 24 games for a complete block; two teams require 4. Shorter runs can be unbalanced. Policy seeds are independently derived from the root seed, match index, and agent label. **The server RNG is not seeded by this interface.** A repeated policy seed does not guarantee the same battles or results.
 

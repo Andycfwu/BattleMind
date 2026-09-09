@@ -117,13 +117,31 @@ def audit_predictions(run: Path) -> dict:
     if sha256(path) != metadata["predictor"]["sha256"]:
         raise ValueError("Frozen run predictor hash mismatch")
     _, table = load_predictor(path)
+    from .learned_policy import LearnedScoreAgent, load_checkpoint
+    checkpoints = {}
+    for side, saved in metadata.get("policy_checkpoints", {}).items():
+        checkpoint_path = run / saved["path"]
+        if sha256(checkpoint_path) != saved["sha256"]:
+            raise ValueError("Frozen policy checkpoint hash mismatch")
+        _, checkpoints[side] = load_checkpoint(checkpoint_path, table)
     count, contextual_changes, v2_changes = 0, 0, 0
     logistic_changes = {"constant": 0, "conditional": 0}
     for row in read_jsonl(run / "decisions.jsonl"):
         name = metadata["policies"][row["player"]]["name"]
-        if name not in {"switch-constant", "switch-context", "switch-logistic"}:
+        if name not in {"switch-constant", "switch-context", "switch-logistic", "learned-score"}:
             continue
-        policy = SwitchAwareAgent(table, {"switch-constant": "constant", "switch-context": "conditional", "switch-logistic": "logistic"}[name])
+        policy = (LearnedScoreAgent(table, checkpoints[row["player"]]) if name == "learned-score" else
+                  SwitchAwareAgent(table, {"switch-constant": "constant", "switch-context": "conditional", "switch-logistic": "logistic"}[name]))
+        if "memory_mode" in row.get("prediction_evaluation", {}):
+            from .adaptation import AdaptedAgent
+            from .opponent_memory import context_from_dict
+            if row["player"] != "a" or metadata.get("adaptation", {}).get("mode") != row["prediction_evaluation"]["memory_mode"]:
+                raise ValueError("Unexpected observer memory routing")
+            before = json.loads((run / f"memory/{row['match']:03d}-before.json").read_text())
+            context = context_from_dict(before["pre_context"])
+            if context.sha256 != row["prediction_evaluation"]["memory_sha256"]:
+                raise ValueError("Memory changed inside battle")
+            policy = AdaptedAgent(table, checkpoints["a"], context, metadata["adaptation"]["mode"])
         rebuilt = policy.evaluate(snapshot_from_dict(row["observation"]))
         if json.loads(json.dumps(asdict(rebuilt))) != row["prediction_evaluation"]:
             raise ValueError("Prediction/scores differ from frozen snapshot and count table")

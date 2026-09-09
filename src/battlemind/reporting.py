@@ -82,6 +82,10 @@ def report(run: Path) -> dict:
         if metadata.get("predictor"):
             predicted = [r["prediction_evaluation"] for r in read_jsonl(run / "decisions.jsonl") if "prediction_evaluation" in r]
             summary["prediction_decisions"] = len(predicted)
+            learned = [r for r in predicted if "initial_choice" in r]
+            if learned:
+                summary["learned_policy_decisions"] = len(learned)
+                summary["learned_choices_changed_from_initial"] = sum(r["chosen_action"] != r["initial_choice"] for r in learned)
             summary["prediction_applied_decisions"] = sum(r["applied"] for r in predicted)
             summary["context_changes_vs_constant_on_same_snapshot"] = sum(r["constant_choice"] != r["conditional_choice"] for r in predicted)
             summary["chosen_action_changes_vs_v2_on_same_snapshot"] = sum(r["chosen_action"] != r["v2_choice"] for r in predicted)

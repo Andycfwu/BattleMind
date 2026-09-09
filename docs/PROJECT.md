@@ -6,10 +6,12 @@ The owner is a college CS student with full-stack experience who wants to learn 
 
 The initial system runs locally on CPU without paid services, rented GPUs, API keys, or cloud accounts. Small data and models come before scaling. The environment must be inspected rather than assumed. This repository builds a **player for the official Showdown engine**, not a battle engine.
 
-## Questions to test later
+## Experimental questions
 
 1. Does adding a learned opponent predictor help the same decision-making system win more battles than it wins without that predictor?
 2. Does remembering an opponent's previous visible actions help more than looking only at the current position?
+3. With the predictor fixed, can learning four action-score parameters improve completed-game outcomes? V5 tests this separately from probability estimation.
+4. With predictor and scoring frozen, does one opponent's earlier public behavior help beyond pooled history? V6 tests cross-encounter memory separately from learning coefficients or policy weights.
 
 These are hypotheses. Negative findings are useful. Neither competitive strength, automatic improvement, research novelty, human-level performance, nor a particular win rate is promised. A percentage prediction alone is not the eventual contribution: the prediction must change a defined action-scoring rule, and improved prediction does not automatically imply improved battle play.
 
@@ -19,12 +21,28 @@ These are hypotheses. Negative findings are useful. Neither competitive strength
 |---|---|
 | Local battle environment | Official local Showdown; owns rules, legal requests, resolution, results, and validation |
 | Observation/action adapter | Frozen, typed, versioned player-visible snapshots; stable semantic IDs mapped to current legal commands |
-| Our battle policy | Chooses our action from sanitized observations: RandomLegalAgent, MaxBasePowerAgent and the documented Gen1HeuristicAgent |
+| Our battle policy | Frozen-snapshot random, MaxBasePower, Gen 1 heuristic, prediction-weighted rules and V5's frozen four-parameter score policy |
 | Opponent predictor | V3/V4: frozen constant frequency, conditional counts and supervised logistic regression; numeric switch probabilities, separate from shared action scoring |
-| Data/training | Audited local observer-to-label datasets, whole-battle partitions, train-only preprocessing and logistic fitting, validation selection, frozen JSON bundles |
+| Cross-encounter memory within prediction | V6: observer-only public proxies, immutable per-battle summaries, pooled or synthetic-session routing, conservative residual adjustment with the predictor/scorer frozen |
+| Data/training | Audited local supervised datasets and frozen logistic bundles; separately, bounded completed-outcome policy updates with archived opponents, phase budgets and safe JSON checkpoints |
 | Evaluation/reporting | Fixed match schedules, explicit failures, reproducible metadata, JSONL and JSON/CSV; independent of training |
 
 Current flow: local Showdown → player's request and public history → immutable observation/legal choices → frozen switch predictor → shared utility scoring → policy ID → checked command → Showdown. Completed games feed a separate audited dataset and supervised training/count-estimation step; evaluation never updates fitted parameters. Privileged recording data establishes targets and evaluation eligibility only and cannot feed policy features.
+
+V5 also sends completed training outcomes to an offline four-parameter update.
+Two perturbed candidates play the same frozen opponent panel and balanced schedule;
+their terminal-reward difference determines the next vector. Fresh selection
+games choose among initialization and two arithmetic updates. Only then is the
+chosen checkpoint evaluated against the frozen initialization on six fixed opponents.
+The V4 predictor never changes. This is derivative-free policy optimization with
+archived self-play, not gradient-based reinforcement learning or individual adaptation.
+
+V6 adds a distinct between-encounter path: the observer's completed public record
+feeds a conservative proxy summary for later encounters. No memory update reads
+private commitment labels or terminal rewards. Each live arm owns its memories;
+all three shadow predictions use that same observer's earlier permitted evidence.
+Keys remain outside features and memories reset across independent groups/phases.
+The frozen V4 predictor and selected V5 score vector are identical across arms.
 
 ## Information boundaries
 
@@ -42,11 +60,11 @@ The Milestone 2 recorder combines both players' attempts only after the clients 
 | V2. Basic strategy — implemented | Documented Gen 1 heuristic, varied legal teams, audited intended choices and voluntary/forced/ambiguous handling. Historical Milestone 2. |
 | V3. Opponent prediction — implemented | Frozen constant and conditional-count switch prediction, audited battle-level dataset, probability evaluation, and prediction-weighted decisions. Compare the same scoring policy with constant versus conditional probabilities; retain V2 as a separate reference. No trained classifier or evaluation-time learning. |
 | V4. Supervised training from local records — implemented | Logistic regression from audited local recorded battles, train-only preprocessing, whole-battle validation, fair count baselines, safe frozen inference, and separate probability/decision/battle evaluation. No arbitrary replay-file ingestion. |
-| V5. Bounded self-play learning — next, requires a new request | Define an actual policy/reward update and frozen-checkpoint evaluation, informed by V4's findings. Generating games alone is not learning. |
-| V6. Individual-opponent adaptation — later | Test whether remembering an individual's earlier visible behavior improves over a non-adaptive version without hidden-state or account-identity shortcuts. No adaptation claim before evidence. |
-| V7. Consolidated benchmarks — later | Consolidate reproducible comparisons, ablations, failures, resource budgets and uncertainty across versions; evaluate suitable held-out teams/opponents for any generalization claim. |
+| V5. Bounded self-play learning — implemented | Four bounded policy-score parameters, outcome-driven antithetic updates against frozen heuristics and archived checkpoints, separate checkpoint selection and frozen initial/selected evaluation. See V5-EXPERIMENT.md and MILESTONE5.md for the single declared run and actual results. |
+| V6. Individual-opponent adaptation — mechanism implemented; acceptance incomplete | Public memory, three frozen V4/V5 arms, shadow predictions and replay audits pass tests. The one acceptance experiment stopped after 96 completed development games because its phase budget could not cover per-cell overhead. No final evaluation ran. See V6-EXPERIMENT.md and STATUS.md; final benefit is unverified. |
+| V7. Consolidated benchmarks — next, requires a new request | Consolidate reproducible comparisons, ablations, failures, resource budgets and a clear demonstration of supported V1–V6 claims. Reserve appropriate held-out settings before any generalization claim. |
 
-This version roadmap follows the owner's requests and replaces the earlier six-milestone ordering. Prediction affects decisions in V3; supervised training from local recorded battles begins in V4. **Benchmark every version as it is developed**; V7 consolidates evidence rather than postponing evaluation. `STATUS.md` records acceptance evidence and historical milestone documents preserve earlier findings. V5–V7, external replay ingestion, a frontend and a replay viewer are not implemented. Each version should be independently useful.
+This version roadmap follows the owner's requests and replaces the earlier six-milestone ordering. Prediction affects decisions in V3; supervised fitting begins in V4, policy learning in V5, and public cross-encounter adjustment in V6. **Benchmark every version as it is developed**; V7 consolidates evidence rather than postponing evaluation. `STATUS.md` records acceptance evidence and historical documents preserve earlier findings. V7, external replay ingestion, human profiling, a frontend and a replay viewer are not implemented. Each version should be independently useful.
 
 ## Prediction experiment and later extensions
 
@@ -58,13 +76,14 @@ Use the same candidate-action scoring system across three variants:
 
 V3 weights damaging-move utility against the current foe and a uniform mixture of publicly revealed living bench Pokémon plus anonymous neutral-type alternatives for unseen slots. Other V2 scores remain unchanged. The conditional probability is defined given a meaningful opponent choice; actual eligibility is often unknown during play, so applying it online is an explicit approximation. See `PREDICTION.md`. There is no alternate simulator or search, and no fabricated natural-language thoughts.
 
-Switch/move labels must reflect genuine choices. Later targets might distinguish move categories, destinations, or hidden moves, but may not use the opponent's private legal-action list as prediction input. Opponent-specific adaptation is a stretch goal that needs measured benefit over a non-adaptive comparison before being advertised.
+Switch/move labels must reflect genuine choices. Later targets might distinguish move categories, destinations, or hidden moves, but may not use the opponent's private legal-action list as prediction input. V6 implements individual synthetic-opponent memory using a public proxy; advertising a performance benefit still requires a separate completed comparison. The current partial development result does not meet that standard.
 
 ## Evaluation design
 
 - Keep training separate from evaluation. Freeze checkpoints and compare against random, a stronger documented heuristic, and frozen previous versions; beating random is not the endpoint.
 - Match team assignments, opponents, sides, compute, and limits between comparison variants. Use several matchups, with suitable held-out teams/opponents or time periods for generalization claims. Restricted-pool wins are restricted-pool results.
 - Split by **whole battle**, keeping both perspectives and all turns together. Never split turns independently. Do not repeatedly tune against the final test set.
+- For V6 memory, also keep every connected encounter in its reset-group partition. Resample independent groups rather than individual memory-linked battles. A whole-battle split alone cannot prevent cross-encounter leakage.
 - Report actual wins/losses/draws and completed-game denominators with uncertainty intervals for later inferential experiments. Choose sample sizes from observed variance and resource constraints; no arbitrary count guarantees significance.
 - Keep truncations, invalid actions, timeouts, crashes, and resource use separate. Never turn a cap or crash into a genuine win. Decide draw/cap handling before comparisons.
 - For voluntary-switch prediction, report class balance, majority/frequency baselines, and probability quality such as Brier score or log loss, rather than accuracy alone. Better classification is not proof of stronger battle play.

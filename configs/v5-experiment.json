@@ -1,0 +1,17 @@
+{
+  "schema_version": "v5-experiment-1",
+  "teams": ["configs/teams/ou-v1-a.txt", "configs/teams/ou-v1-b.txt", "configs/teams/ou-v2-c.txt", "configs/teams/ou-v2-d.txt"],
+  "cell_games": 24,
+  "rounds": 2,
+  "phase_games": {"training": 336, "selection": 216, "final": 288},
+  "phase_seconds": {"training": 420, "selection": 300, "final": 420},
+  "total_seconds": 1200,
+  "total_games": 840,
+  "turn_cap": 300,
+  "match_timeout": 60,
+  "proposal_seed_base": 51500,
+  "training_policy_seed_base": 51600,
+  "selection_seed": 51701,
+  "final_seed": 51801,
+  "bootstrap_seed": 51901
+}

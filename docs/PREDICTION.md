@@ -179,3 +179,38 @@ learning would require a defined policy/reward update loop and checkpoint
 evaluation; merely generating these games is not such a loop. There is no external
 replay ingestion, online adaptation, private-state oracle or second battle engine.
 See [STATUS.md](STATUS.md) for the three separate empirical conclusions.
+## V5: frozen prediction, learned action scores
+
+V5 preserves the complete V4 predictor, preprocessing and `visible-logistic-v1`
+schema, with SHA-256
+`44a403e1771cf15f31987a08d31c7856900f04d3fc2eca2c957a23704f04a252`.
+It learns four separate action-score controls from completed training outcomes.
+The probability on an identical snapshot cannot change when policy parameters
+change. Initial V5 scores and choices exactly matched V4 on all 20,620 retained
+V4 final snapshots; V4 code/results remain historical evidence in MILESTONE4.md.
+
+See [POLICY-LEARNING.md](POLICY-LEARNING.md) for the new code paths and
+[V5-EXPERIMENT.md](V5-EXPERIMENT.md) for the predeclared schedule. V4's supervised
+prediction task and V5's self-play policy optimization are distinct experiments.
+Neither implements individual-opponent adaptation. The original prediction
+design below remains applicable and its limitations still constrain V5.
+
+## V6: adjustment from earlier public encounters
+
+V6 adds an independent probability adjustment on top of the original V4 model,
+using the selected V5 scoring vector unchanged. `none`, `pooled` and `individual`
+all call the same scorer. Pooled and individual summaries use the same prior,
+clipping and conservative public-announcement proxy; only evidence routing differs.
+Each live observer owns its history, which is frozen during each battle and updated
+only after a completed encounter. Its three shadow predictions are evaluated on
+identical snapshots against privileged labels only after play. Keys and label
+eligibility never enter prediction features.
+
+This is cross-encounter behavioral adjustment, distinct from V4 supervised fitting
+and V5 outcome-driven policy learning. There is no V6 coefficient or policy update.
+The permitted evidence, equations, proxy limitations and deterministic replay are
+documented in [ADAPTATION.md](ADAPTATION.md). The single declared experiment stopped
+on its development budget after 96 completed games; no final games ran. Exploratory
+shadow Brier scores were .083013 without memory, .084411 pooled and .072807 individual
+on the same 2,222 eligible snapshots. These partial, one-group development results
+do not establish final improvement. [STATUS.md](STATUS.md) records the limitations.

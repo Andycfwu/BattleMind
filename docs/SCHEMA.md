@@ -91,6 +91,125 @@ group metrics, primary and full exclusions, calibration support and paired
 whole-battle resampling. Run/decision/evidence hashes detect accidental changes;
 they are not cryptographic authentication against a malicious local editor.
 
+## V5 policy checkpoints and experiment records
+
+The snapshot remains **1.1** with no new features or privileged fields. V5 adds to
+`prediction_evaluation` the frozen four-parameter vector, checkpoint SHA-256,
+`v5-residual-scores-1` scoring version, and initial-policy scores/choice on this
+same snapshot. Existing alternate constant/count/logistic choices refer to the
+unchanged V4 baseline scorer. `chosen_action` and `scores` record the played V5
+policy. All of these outer evaluation fields are recorder output, never fed back
+as observation features.
+
+`checkpoint-a.json` / `checkpoint-b.json` are frozen `v5-policy-1` JSON copies.
+`run.json.policy_checkpoints` records each input digest. The loader checks exact
+field sets, finite parameter bounds, scoring-source hashes, predictor digest,
+snapshot/feature/scoring versions and pinned version record. Only a
+`FrozenCheckpoint(parameters, sha256)` enters the policy; provenance, parent IDs,
+opponent identities and training outcomes remain in offline artifacts.
+
+At the experiment root, `freeze.json` captures source/config/specification hashes
+before training. `ledger.json` (`v5-ledger-1`) reserves requested games before each
+cell starts, includes reserved final allocations, wall usage, all run results and
+disjoint `SHA256(run.json):match` partitions. A missing result does not refund a
+reservation. Phase order is training, selection, final. Resume is unsupported.
+`rounds/round-N.json` freezes each proposal/seed/parent/pool before its games;
+`rounds/update-N.json` points to completed training cells and records the outcome
+contrast, arithmetic update and resulting checkpoint digest. No turn labels are
+used as V5 rewards.
+
+`selection.json` records the fresh selection games and declared tie rule;
+`selected.json` copies the selected checkpoint verbatim. `final-freeze.json`
+locks both evaluation arms and opponent panel before final games. Final outcomes
+are reports only. `decision-comparisons.jsonl` re-evaluates initial and selected
+choices on each final player-a snapshot, preserving run/decision/snapshot IDs.
+`summary.json` reports phases, outcomes, warnings, labels, resource samples and
+descriptive block intervals. `artifact-hashes.json` covers all earlier generated
+files. Read-only `policy-report --audit` replays every decision/label audit and
+reconstructs updates and selection from the appropriate completed-game partitions.
+
+Hash checks detect accidental incompatibility; they are not authentication against
+a malicious editor. A hard process kill can leave reserved-but-unrecorded games;
+those are missing evidence, never ordinary rewards. Live player journals and exact
+commitment matching below remain unchanged.
+
+## V6 public memory and adaptation records
+
+`DecisionSnapshot` remains **1.1**. No account, session, checkpoint, team-file or
+target-policy identity is added to it. The underlying `visible-logistic-v1` features
+and `v5-residual-scores-1` scoring implementation stay unchanged. The original V4
+bundle and selected V5 checkpoint must pass their existing compatibility loaders.
+
+A policy's immutable constructor `MemoryContext` contains only pooled and individual
+`HistorySummary` values: version `public-encounter-residual-v1`, supported encounter
+count, admitted example count and sum of per-encounter mean residuals. It contains no
+registry, routing keys, source records or mutable manager. Both counts and residuals
+are validated. Counts are support, not independent-turn confidence. A new summary is
+constructed between encounters; the policy still receives only a frozen snapshot
+on each decision. See [ADAPTATION.md](ADAPTATION.md) for the exact adjustment.
+
+V6 files in each four-game cell:
+
+- `run.json.adaptation` contains arm, opaque synthetic observer/session routing and
+  version metadata **outside features**. Each arm/group owns a separate registry.
+- `memory/NNN-before.json` records the frozen numeric context, its digest, global
+  encounter ordinal, previous session encounter count and routing keys.
+- `observer/NNN.json` contains only that observer's frozen snapshots, its own final
+  public event projection, and completion flag. The runner exports this before
+  post-match privileged recording. No winner, label or private engine field enters
+  this file. Snapshot hashes and public-prefix indices identify chronological inputs.
+- `memory/NNN-after.json` records every admitted/skipped evidence window and reason,
+  public event references, earlier snapshot/request/turn, frozen base probability,
+  admitted proxy, encounter residual and pre/post digests. Incomplete encounters
+  contribute no memory update. Unknown, forced, engine and unannounced actions are
+  retained as such; absence of a switch announcement never implies a move choice.
+- The existing separate player journals and merged decision records gain outer
+  `prediction_evaluation` fields: memory version/context/digest/mode, base V4
+  probability, all three shadow probabilities and choices, support/fallback and
+  played candidate scores. Only the designated arm controls play. Inherited V5
+  fields describe that arm's probability/scoring; the explicit `none` shadow is the
+  unchanged selected-V5 control. These output fields are never observation inputs.
+- `adaptation-audit.json` records public replay and the separate private commitment
+  audit. `memory_audit.replay_cell()` never opens labels or official end logs. It
+  reconstructs memory only from the observer export, then checks predictions/scores
+  and choices against that observer's saved journal. Private mutation may fail the
+  commitment audit but cannot change public reconstruction.
+
+At the experiment root, `freeze.json` records source/spec/config and required model
+hashes; `predictor.json` and `checkpoint.json` are unchanged retained copies.
+`ledger.json` (`v6-budget-1`) reserves final allocation before development, tracks
+every requested cell and consumed time, and stores reset groups plus disjoint
+`SHA256(run.json):match` identities. Memory-linked encounters stay in one partition.
+No resume, refund, retry or borrowing is supported. `final-freeze.json` exists only
+if completed development permits entry into final; it is **absent in the actual
+budget-stopped V6 run**. No final memories or games were created there.
+
+`shadow-predictions.jsonl` joins the three public-only predictions to eligible
+privileged labels offline, preserving observer snapshot/decision and target joins.
+`shadow-decisions.jsonl` also retains observer requests excluded from probability
+evaluation. `public-updates.jsonl` summarizes memory admission/support per encounter.
+`summary.json` reports phase outcomes, probability quality/calibration, exclusions,
+coverage, choice differences, resources and audit status. `artifact-hashes.json`
+protects the frozen output files. A later read-only audit verifies these hashes;
+the original summary's `artifact_files: 0` reflects creation before the manifest,
+not missing evidence. The completed CLI audit checked 1,064 files.
+
+For the stopped run, `status: failed` means the experiment did not finish;
+`audit.ok: true` verifies the **96 recorded encounters**, not acceptance completion.
+Use `phases.final.requested_games: 0` for actual requests. The empty `final_battles`
+grid retains the predeclared 192-game-per-arm allocation: its unrecorded values
+describe planned final slots, not launched or failed games. No such slots become
+outcomes. `runs/v6-development-review.json` supplies a separate, clearly exploratory
+breakdown of the partial development rows by arm, target and cold/later encounters;
+it does not modify the frozen experiment or its final reporting criteria.
+
+One failed-phase timing limitation is preserved: repeated finalization charges
+post-stop reporting/hashing to the still-active failed phase. The saved summary
+captured development at 165.731s when collection stopped; the final ledger and
+read-only report show 181.450s including that later overhead. Total experiment
+wall is consistently 181.465s, and final usage is zero. See STATUS for the corrected
+interpretation; no extra games ran during this difference and no ledger was edited.
+
 ## Execution evidence and auditing
 
 For each verified intended choice, the recorder examines that client's public history after the frozen snapshot and before its next decision (or the final history). The earlier history must be an exact prefix. `move_announced` means a matching move announcement, **not** that it hit or had an effect. `switch_observed` requires a matching public switch. `prevented_or_engine_wait` records a public `cant` event. `not_announced` means no matching announcement in a completed stream, without guessing why. Incomplete, conflicting or missing evidence stays `unknown`. Event indices preserve the evidence window.

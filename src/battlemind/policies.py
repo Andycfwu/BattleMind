@@ -40,10 +40,13 @@ class MaxBasePowerAgent:
 
 
 POLICY_NAMES = ("random", "max-base-power", "gen1-heuristic", "switch-constant", "switch-context",
-                "switch-logistic", "switch-moderate", "switch-active")
+                "switch-logistic", "switch-moderate", "switch-active", "learned-score")
 
 
-def make_policy(name: str, seed: int, counts=None) -> Policy:
+def make_policy(name: str, seed: int, counts=None, checkpoint=None) -> Policy:
+    if name == "learned-score":
+        from .learned_policy import LearnedScoreAgent
+        return LearnedScoreAgent(counts, checkpoint)
     if name in {"switch-moderate", "switch-active"}:
         from .opponents import SwitchingHeuristicAgent
         return SwitchingHeuristicAgent(40 if name == "switch-moderate" else 0)

@@ -22,6 +22,8 @@ def parser() -> argparse.ArgumentParser:
             cmd.add_argument("--start-server", action="store_true", help="Start and stop our pinned loopback server for this command")
         if name == "battle":
             cmd.add_argument("--predictor", help="Frozen local counts or supervised JSON bundle; copied into the run")
+            cmd.add_argument("--checkpoint-a", help="Frozen learned-score checkpoint for player a")
+            cmd.add_argument("--checkpoint-b", help="Frozen learned-score checkpoint for player b")
             for key, kind in (("agent-a", str), ("agent-b", str), ("battles", int), ("seed", int),
                               ("concurrency", int), ("turn-cap", int), ("timeout", float), ("run-timeout", float)):
                 cmd.add_argument(f"--{key}", type=kind)
@@ -57,10 +59,57 @@ def parser() -> argparse.ArgumentParser:
         if name == "supervised-evaluate":
             cmd.add_argument("--predictor", type=Path, required=True)
             cmd.add_argument("--partition", choices=("development_check", "evaluation"), required=True)
+    cmd = sub.add_parser("policy-train", help="Run the fixed bounded V5 training, selection and reserved final experiment")
+    cmd.add_argument("--output", type=Path, required=True)
+    cmd.add_argument("--predictor", type=Path, default=ROOT / "models/v4-supervised.json")
+    cmd = sub.add_parser("policy-evaluate", help="Evaluate one frozen checkpoint locally; no updates")
+    cmd.add_argument("--checkpoint", type=Path, required=True)
+    cmd.add_argument("--predictor", type=Path, default=ROOT / "models/v4-supervised.json")
+    cmd.add_argument("--opponent", default="gen1-heuristic")
+    cmd.add_argument("--opponent-checkpoint", type=Path)
+    cmd.add_argument("--output", type=Path, required=True)
+    cmd.add_argument("--battles", type=int, default=24)
+    cmd.add_argument("--seed", type=int, default=51801)
+    cmd = sub.add_parser("policy-report", help="Read or fully audit a retained learning experiment; no games/updates")
+    cmd.add_argument("--experiment", type=Path, required=True)
+    cmd.add_argument("--audit", action="store_true")
+    cmd = sub.add_parser("adaptation-run", help="Single-use bounded V6 public-memory experiment")
+    cmd.add_argument("--output", type=Path, required=True)
+    cmd = sub.add_parser("adaptation-report", help="Read or replay-audit a V6 experiment; no games")
+    cmd.add_argument("--experiment", type=Path, required=True)
+    cmd.add_argument("--audit", action="store_true")
     return root
 
 
 async def dispatch(args) -> tuple[dict, int]:
+    if args.command == "adaptation-run":
+        from .adaptation_experiment import run_adaptation
+        result = await run_adaptation(args.output)
+        return result, 0 if result["status"] == "finished" else 1
+    if args.command == "adaptation-report":
+        from .adaptation_report import build_adaptation_report
+        result = (build_adaptation_report(args.experiment, audit=True) if args.audit else
+                  json.loads((args.experiment / "summary.json").read_text()))
+        return result, 0 if result["status"] == "finished" else 1
+    if args.command == "policy-train":
+        from .learning import train_experiment
+        result = await train_experiment(args.output, args.predictor)
+        return result, 0 if result["ledger_status"] == "finished" else 1
+    if args.command == "policy-evaluate":
+        from .prediction_report import audit_predictions
+        teams = tuple(json.loads((ROOT / "configs/v5-experiment.json").read_text())["teams"])
+        config = RunConfig(agent_a="learned-score", agent_b=args.opponent, teams=teams,
+            battles=args.battles, seed=args.seed, predictor=str(args.predictor), checkpoint_a=str(args.checkpoint),
+            checkpoint_b=str(args.opponent_checkpoint) if args.opponent_checkpoint else None)
+        result = await run(config, args.output, start_server=True)
+        result["audit"] = audit_predictions(args.output)
+        return result, 0 if result["completed"] == args.battles and not result["invalid_action_incidents"] else 1
+    if args.command == "policy-report":
+        from .learning_report import audit_experiment
+        result = json.loads((args.experiment / "summary.json").read_text())
+        if args.audit:
+            result["audit"] = audit_experiment(args.experiment)
+        return result, 0 if result["ledger_status"] == "finished" else 1
     if args.command == "supervised-dataset":
         from .supervised_data import build_supervised_dataset
         result = build_supervised_dataset(args.runs, args.output, args.seed, args.role)

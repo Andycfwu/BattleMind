@@ -22,3 +22,24 @@ audited data plumbing, safe frozen bundle, fair baseline fitting, common-scoring
 integration, budget enforcement and empirical comparison. The classifier learns
 from this project's recorded local choices. Fixed threshold opponents reuse V2's
 utilities; they are simple project-written variants, not imported strong agents.
+
+V5 implements a small antithetic random-direction finite-difference update using
+NumPy's seeded generator and bounded parameter projection. This belongs to standard
+black-box policy optimization; [Salimans et al. (2017)](https://arxiv.org/abs/1703.03864)
+provides broader evolutionary-strategy context. BattleMind's two-round, four-parameter
+Rademacher-direction method is not a reproduction of that paper's large experiments
+or a novel optimizer, and no code/model was copied from it. It is not gradient-based
+reinforcement learning. The project-specific work is defining an interpretable score
+vector with an exactly equivalent control, preserving frozen prediction and information
+boundaries, recording actual outcome-driven arithmetic updates, scheduling immutable
+archived opponents, reserving separate selection/final budgets, validating safe
+checkpoints and reconstructing the experiment from audited evidence. All V5 opponents
+and checkpoints come from the project's own local runs and existing policies.
+
+V6 uses standard residual adjustment, shrinkage, clipping and group-level bootstrap
+ideas; it does not claim a novel model or import adaptation code. BattleMind's work
+is the observer-only public evidence extractor, explicit proxy exclusions, immutable
+memory summaries, opaque routing outside features, frozen common V4/V5 scorer,
+same-snapshot shadow comparison, chronological reconstruction and persistent phase
+budgets. No human profiles or external behavior data are used. The partial V6
+development result is retained with its budget stop; final benefit is unverified.

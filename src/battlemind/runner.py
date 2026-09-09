@@ -25,7 +25,11 @@ from .labels import build_labels, engine_record, label_summary, read_jsonl, snap
 from .policies import POLICY_NAMES, make_policy
 from .prediction import CountTable
 from .supervised import PredictorBundle
+from .learned_policy import FrozenCheckpoint, load_checkpoint
 from .reporting import JsonlWriter, report
+from .memory_runtime import EncounterController
+from .opponent_memory import MemoryContext
+from .schema import snapshot_from_dict
 
 
 @dataclass(frozen=True)
@@ -43,23 +47,30 @@ class RunConfig:
     showdown: str = ".local/pokemon-showdown"
     teams: tuple[str, ...] = ("configs/teams/ou-v1-a.txt", "configs/teams/ou-v1-b.txt")
     predictor: str | None = None
+    checkpoint_a: str | None = None
+    checkpoint_b: str | None = None
+    schedule_offset: int = 0
 
     def validate(self) -> None:
         if self.format != "gen1ou":
             raise ValueError("Only the verified gen1ou format is supported")
         if self.concurrency != 1:
             raise ValueError("BattleMind supports concurrency=1 only")
+        if type(self.schedule_offset) is not int or not 0 <= self.schedule_offset <= 100:
+            raise ValueError("Schedule offset must be an integer in 0..100")
         if not 1 <= self.battles <= 100 or not 1 <= self.turn_cap <= 1000:
             raise ValueError("Use 1..100 battles and 1..1000 turns")
         if not 0.01 <= self.timeout <= 300 or not 0.01 <= self.run_timeout <= 3600:
             raise ValueError("Timeouts must be positive and bounded (match <=300s, run <=3600s)")
         if not 1024 <= self.port <= 65535 or not self.teams:
             raise ValueError("Use a port in 1024..65535 and at least one team")
-        for agent in (self.agent_a, self.agent_b):
+        for agent, checkpoint in ((self.agent_a, self.checkpoint_a), (self.agent_b, self.checkpoint_b)):
             if agent not in POLICY_NAMES:
                 raise ValueError(f"Unknown policy: {agent}")
-            if agent in {"switch-constant", "switch-context", "switch-logistic"} and not self.predictor:
+            if agent in {"switch-constant", "switch-context", "switch-logistic", "learned-score"} and not self.predictor:
                 raise ValueError("Switch-aware policies require --predictor")
+            if (agent == "learned-score") != (checkpoint is not None):
+                raise ValueError("Each learned-score side requires its own checkpoint; other policies take no checkpoint")
 
 
 def policy_seed(seed: int, match: int, side: str) -> int:
@@ -109,8 +120,15 @@ class ErrorRecorder(logging.Handler):
 
 class LocalPlayer(Player):
     def __init__(self, *, policy_name: str, seed: int, side: str, state: MatchState,
-                 journal: JsonlWriter | None = None, counts: CountTable | PredictorBundle | None = None, **kwargs):
-        self.policy = make_policy(policy_name, seed, counts)
+                 journal: JsonlWriter | None = None, counts: CountTable | PredictorBundle | None = None,
+                 checkpoint: FrozenCheckpoint | None = None, memory_context: MemoryContext | None = None,
+                 memory_mode: str | None = None, **kwargs):
+        self.policy = make_policy(policy_name, seed, counts, checkpoint)
+        if memory_context is not None:
+            from .adaptation import AdaptedAgent
+            if policy_name != "learned-score":
+                raise ValueError("V6 uses frozen learned-score only")
+            self.policy = AdaptedAgent(counts, checkpoint, memory_context, memory_mode)
         self.side, self.state = side, state
         self.journal = journal or state.decisions_log
         self.trackers: dict[str, PublicTracker] = {}
@@ -212,19 +230,24 @@ async def close_players(players: list[LocalPlayer]) -> None:
 
 async def play_match(config: RunConfig, index: int, decisions: JsonlWriter, events: JsonlWriter,
                      deadline: float, output: Path, engine_logs: Path, labels_log: JsonlWriter,
-                     counts: CountTable | PredictorBundle | None = None) -> dict:
+                     counts: CountTable | PredictorBundle | None = None,
+                     checkpoints: dict[str, FrozenCheckpoint] | None = None,
+                     memory_controller: EncounterController | None = None) -> dict:
     state = MatchState(index, config.turn_cap, decisions, events)
     start = time.monotonic()
-    assignments, challenger = scheduled_match(index, len(config.teams))
+    assignments, challenger = scheduled_match(index + config.schedule_offset, len(config.teams))
     seeds = {s: policy_seed(config.seed, index, s) for s in ("a", "b")}
     players: list[LocalPlayer] = []
     handlers: list[ErrorRecorder] = []
     battle_task = None
     journals = {s: JsonlWriter(output / "privileged/attempts" / f"{index:03d}-{s}.jsonl") for s in ("a", "b")}
     try:
+        memory_context = memory_controller.before(output, index) if memory_controller else None
         for side, name in (("a", config.agent_a), ("b", config.agent_b)):
             player = LocalPlayer(policy_name=name, seed=seeds[side], side=side, state=state,
-                journal=journals[side], counts=counts,
+                journal=journals[side], counts=counts, checkpoint=(checkpoints or {}).get(side),
+                memory_context=memory_context if side == "a" else None,
+                memory_mode=memory_controller.mode if memory_controller and side == "a" else None,
                 account_configuration=AccountConfiguration("bm" + uuid.uuid4().hex[:16], None),
                 server_configuration=ServerConfiguration(f"ws://127.0.0.1:{config.port}/showdown/websocket", "http://127.0.0.1:1/action.php?"),
                 battle_format=config.format, max_concurrent_battles=1, open_timeout=5,
@@ -265,6 +288,16 @@ async def play_match(config: RunConfig, index: int, decisions: JsonlWriter, even
                 remaining.close()
         for journal in journals.values():
             journal.close()
+    if memory_controller and memory_controller.pending is not None:
+        try:
+            # Read only observer a's own journal and its own public tracker, before any privileged join.
+            observer = next((p for p in players if p.side == "a"), None)
+            observations = tuple(snapshot_from_dict(r["observation"]) for r in
+                read_jsonl(output / "privileged/attempts" / f"{index:03d}-a.jsonl"))
+            history = tuple(e for tracker in observer.trackers.values() for e in tracker.history) if observer else ()
+            memory_controller.after(output, index, observations, history, state.reason is None)
+        except Exception as exc:
+            state.fail("crash", f"Observer memory error: {exc}")
     # Both clients are now stopped. Only this post-match recorder reads both attempts.
     rows = sorted([r for s in ("a", "b") for r in read_jsonl(output / "privileged/attempts" / f"{index:03d}-{s}.jsonl")],
                   key=lambda r: r["observation"]["request_id"])
@@ -294,8 +327,11 @@ async def play_match(config: RunConfig, index: int, decisions: JsonlWriter, even
             "labels": label_summary(labels)}
 
 
-async def run(config: RunConfig, output: Path, start_server: bool = False) -> dict:
+async def run(config: RunConfig, output: Path, start_server: bool = False,
+              memory_controller: EncounterController | None = None) -> dict:
     config.validate()
+    if memory_controller and config.agent_a != "learned-score":
+        raise ValueError("Observer memory requires frozen learned-score player a")
     diagnostics = inspect_server((ROOT / config.showdown).resolve(), [ROOT / p for p in config.teams], config.port)
     output = output.resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -309,11 +345,22 @@ async def run(config: RunConfig, output: Path, start_server: bool = False) -> di
         _, counts = load_predictor(output / "predictor.json")
         predictor_meta = {"source_path": str(source.resolve()), "sha256": sha256(output / "predictor.json"),
                           "evaluation_updates": False}
+    checkpoints, checkpoint_meta = {}, {}
+    for side, path in (("a", config.checkpoint_a), ("b", config.checkpoint_b)):
+        if path is not None:
+            if not isinstance(counts, PredictorBundle):
+                raise ValueError("Learned checkpoints require a compatible supervised predictor")
+            destination = output / f"checkpoint-{side}.json"
+            destination.write_bytes((ROOT / path).read_bytes())
+            _, checkpoints[side] = load_checkpoint(destination, counts)
+            checkpoint_meta[side] = {"path": destination.name, "sha256": sha256(destination), "evaluation_updates": False}
     metadata = {"schema_version": "2.0", "created_utc": datetime.now(timezone.utc).isoformat(),
                 "config": asdict(config), "environment": diagnostics, "code_sha256": source_manifest(),
                 "predictor": predictor_meta,
-                "policies": {"a": {"name": config.agent_a, "version": make_policy(config.agent_a, config.seed, counts).version},
-                             "b": {"name": config.agent_b, "version": make_policy(config.agent_b, config.seed, counts).version}},
+                **({"adaptation": memory_controller.metadata()} if memory_controller else {}),
+                **({"policy_checkpoints": checkpoint_meta} if checkpoint_meta else {}),
+                "policies": {"a": {"name": config.agent_a, "version": make_policy(config.agent_a, config.seed, counts, checkpoints.get("a")).version},
+                             "b": {"name": config.agent_b, "version": make_policy(config.agent_b, config.seed, counts, checkpoints.get("b")).version}},
                 "host": {"os": platform.platform(), "logical_cpus": psutil.cpu_count(),
                          "ram_bytes": psutil.virtual_memory().total},
                 "randomness": {"policy": "SHA256(root seed:match index:a/b), independent random.Random",
@@ -358,7 +405,7 @@ async def run(config: RunConfig, output: Path, start_server: bool = False) -> di
                     abort_reason = "Run deadline reached"
                     break
                 log_root = output / "privileged/engine" if start_server else ROOT / config.showdown / "logs"
-                row = await play_match(config, index, decisions, events, deadline, output, log_root, labels_log, counts)
+                row = await play_match(config, index, decisions, events, deadline, output, log_root, labels_log, counts, checkpoints, memory_controller)
                 battles.write(row)
                 recorded += 1
                 print(f"Match {index + 1}/{config.battles}: {row['status']} winner={row['winner']} turns={row['turns']}", flush=True)

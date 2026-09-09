@@ -211,3 +211,90 @@ def test_v4_real_record_training_frozen_inference_and_audit():
     assert quality["balance"]["examples"] > 0
     assert all(0 <= m["brier"] <= 1 for m in quality["metrics"].values())
     assert sha256(model) == frozen == sha256(evaluation / "predictor.json")
+
+
+def test_v5_real_selfplay_outcome_update_checkpoint_and_frozen_evaluation():
+    from battlemind.environment import sha256
+    from battlemind.learned_policy import PolicyParameters, save_checkpoint, load_checkpoint
+    from battlemind.policy_search import propose, outcome_update
+    from battlemind.prediction_report import audit_predictions
+    from battlemind.supervised_data import load_bundle
+
+    root = ROOT / "runs" / ("integration-v5-" + uuid.uuid4().hex[:10])
+    predictor_path = ROOT / "models/v4-supervised.json"
+    _, bundle = load_bundle(predictor_path)
+    initial = root / "initial.json"
+    save_checkpoint(initial, PolicyParameters(), bundle, {"kind": "integration-initial"})
+    original_hash = sha256(predictor_path)
+    initial_hash = sha256(initial)
+    proposal = propose(PolicyParameters(), 51501)
+    records = {}
+    for sign in ("plus", "minus"):
+        checkpoint = root / f"{sign}.json"
+        save_checkpoint(checkpoint, getattr(proposal, sign), bundle, {"kind": "integration-proposal", "sign": sign})
+        config = replace(RunConfig(), battles=4, agent_a="learned-score", agent_b="learned-score",
+            predictor=str(predictor_path), checkpoint_a=str(checkpoint), checkpoint_b=str(initial), port=free_port())
+        path = root / sign
+        result = asyncio.run(run(config, path, start_server=True))
+        assert result["completed"] == 4, result
+        audit_run(path, 4)
+        assert audit_predictions(path)["prediction_decisions"] == result["decisions"]
+        records[sign] = read_rows(path / "battles.jsonl")
+    parameters, update = outcome_update(proposal, records["plus"], records["minus"], 4)
+    checkpoint = root / "updated.json"
+    save_checkpoint(checkpoint, parameters, bundle, {"kind": "integration-outcome-update", **update})
+    frozen_hash = sha256(checkpoint)
+    config = replace(config, checkpoint_a=str(checkpoint), port=free_port())
+    path = root / "evaluation"
+    result = asyncio.run(run(config, path, start_server=True))
+    assert result["completed"] == 4, result
+    audit_run(path, 4)
+    assert audit_predictions(path)["prediction_decisions"] == result["decisions"]
+    assert sha256(checkpoint) == frozen_hash and load_checkpoint(checkpoint, bundle)[1].parameters == parameters
+    assert sha256(predictor_path) == original_hash and sha256(initial) == initial_hash
+
+
+def test_v6_real_public_encounter_memory_replay_and_privileged_independence(tmp_path):
+    import shutil
+    from battlemind.adaptation_experiment import artifacts, PREDICTOR, CHECKPOINT, CONFIG
+    from battlemind.environment import sha256
+    from battlemind.labels import audit_labels
+    from battlemind.memory_runtime import EncounterController
+    from battlemind.memory_audit import replay_cell
+    from battlemind.opponent_memory import ObserverMemory
+    from battlemind.prediction_report import audit_predictions
+
+    root = ROOT / "runs" / ("integration-v6-" + uuid.uuid4().hex[:10])
+    bundle, checkpoint = artifacts()
+    frozen_hashes = sha256(PREDICTOR), sha256(CHECKPOINT)
+    manager, replay = ObserverMemory(), ObserverMemory()
+    teams = tuple(json.loads(CONFIG.read_text())["teams"])
+    all_decisions = []
+    for i, target in enumerate(("switch-active", "max-base-power")):
+        path = root / f"encounters-{i}"
+        controller = EncounterController(manager, f"opaque-{i}", "one-observer", "individual", bundle)
+        config = RunConfig(agent_a="learned-score", agent_b=target, predictor=str(PREDICTOR), checkpoint_a=str(CHECKPOINT),
+            teams=teams, schedule_offset=i * 4, battles=4, port=free_port())
+        result = asyncio.run(run(config, path, start_server=True, memory_controller=controller))
+        assert result["completed"] == 4 and result["invalid_action_incidents"] == 0, result
+        assert audit_predictions(path)["prediction_decisions"] == len(read_rows(path / "privileged/attempts/000-a.jsonl")) + sum(
+            len(read_rows(path / f"privileged/attempts/{m:03d}-a.jsonl")) for m in range(1, 4))
+        rebuilt = replay_cell(path, replay, bundle, checkpoint)
+        all_decisions.extend(rebuilt["decisions"])
+        assert replay.pooled == manager.pooled and replay.sessions == manager.sessions
+    assert any(r["probabilities"]["individual"] != r["probabilities"]["none"] for r in all_decisions)
+    assert manager.next_ordinal == 8 and len(manager.sessions) == 2
+    assert (sha256(PREDICTOR), sha256(CHECKPOINT)) == frozen_hashes
+    # Corrupt only a COPY of newly generated test evidence, never historical artifacts.
+    copied = tmp_path / "tampered"
+    shutil.copytree(root / "encounters-0", copied)
+    engine_path = copied / read_rows(copied / "battles.jsonl")[0]["engine_record"]["path"]
+    data = json.loads(engine_path.read_text())
+    data["private_v6_test"] = {"team": "hidden replacement", "rng": "altered"}
+    engine_path.write_text(json.dumps(data))
+    labels = read_rows(copied / "privileged/labels.jsonl")
+    labels[0]["voluntary_switch_target"] = 1
+    (copied / "privileged/labels.jsonl").write_text("\n".join(json.dumps(r) for r in labels) + "\n")
+    assert replay_cell(copied, ObserverMemory(), bundle, checkpoint) == replay_cell(root / "encounters-0", ObserverMemory(), bundle, checkpoint)
+    with pytest.raises(ValueError):
+        audit_labels(copied)
