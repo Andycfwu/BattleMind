@@ -1,0 +1,32 @@
+{
+  "schema_version": "reinforce-spec-1",
+  "kind": "smoke",
+  "document": "docs/REINFORCE-SMOKE.md",
+  "maximum_games": 48,
+  "maximum_seconds": 300,
+  "games": {
+    "training": 24,
+    "selection": 0,
+    "final": 24
+  },
+  "seconds": {
+    "training": 130,
+    "selection": 10,
+    "final": 130,
+    "overhead": 30
+  },
+  "updates": 1,
+  "candidates": [
+    0,
+    1
+  ],
+  "actor_lr": 0.3,
+  "value_lr": 0.1,
+  "seed": 82000,
+  "teams": [
+    "configs/teams/ou-v1-a.txt",
+    "configs/teams/ou-v1-b.txt",
+    "configs/teams/ou-v2-c.txt",
+    "configs/teams/ou-v2-d.txt"
+  ]
+}

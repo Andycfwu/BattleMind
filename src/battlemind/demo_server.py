@@ -90,11 +90,19 @@ class Spectator:
 
 
 async def serve(bundle: Path, output: Path, port: int=8765, games: int=2, seconds: int=1800,
-                recordings: Path | None=None):
+                recordings: Path | None=None, reinforce_checkpoint: Path | None=None):
     if not 0<=games<=8 or not 1<=seconds<=3600 or not 1024<=port<=65535 or port==8000:
         raise ValueError('Viewer: 0..8 games, 1..3600 service seconds, separate unprivileged port')
     verified=verify(bundle)
     output.mkdir(parents=True,exist_ok=False)
+    available_policies=LIVE_POLICIES
+    extra_model=None
+    if reinforce_checkpoint is not None:
+        from .reinforce import load_checkpoint
+        load_checkpoint(reinforce_checkpoint)
+        extra_model=output/'optional-reinforce.json'
+        extra_model.write_bytes(reinforce_checkpoint.read_bytes())
+        available_policies=LIVE_POLICIES+('reinforce',)
     manifest=json.loads((bundle/'manifest.json').read_text())
     replays={i:json.loads((bundle/f'replays/{i}.json').read_text()) for i in manifest['replays']}
     imported_recordings={}
@@ -112,6 +120,7 @@ async def serve(bundle: Path, output: Path, port: int=8765, games: int=2, second
         'requested':0,'maximum_games':games,'maximum_run_seconds':300,'run_seconds':0.0,'state':'idle','runs':[],
         'source':demo_sources(),'bundle_manifest_sha256':verified['manifest_sha256'],
         'imported_public_recordings':imported_recordings}
+    if extra_model: ledger['optional_reinforce_sha256']=sha256(extra_model)
     write(output/'ledger.json',ledger)
     # Exact endpoint maps. Neither models nor observer/private audit inputs are served.
     files={'/':ROOT/'src/battlemind/viewer/index.html',
@@ -148,7 +157,7 @@ async def serve(bundle: Path, output: Path, port: int=8765, games: int=2, second
                 # JSON serialization makes a detached display copy; browser cannot mutate state.
                 data={'replays':[{k:r[k] for k in ('id','title','status','origin')} for r in replays.values()],
                     'ledger':{k:ledger[k] for k in ('requested','maximum_games','run_seconds','maximum_run_seconds','state')},
-                    'policies':LIVE_POLICIES,'token':token,'live_adaptation':False}
+                    'policies':available_policies,'token':token,'live_adaptation':False}
                 return self.respond(200,json.dumps(data).encode())
             if route.startswith('/api/replay/'):
                 ident=route.removeprefix('/api/replay/')
@@ -165,7 +174,7 @@ async def serve(bundle: Path, output: Path, port: int=8765, games: int=2, second
                 data=json.loads(self.rfile.read(length))
                 if self.path=='/api/stop':
                     loop.call_soon_threadsafe(stop.set);return self.respond(200,b'{"stopping":true}')
-                if self.path!='/api/demo' or set(data)!={'agent_a','agent_b'} or any(v not in LIVE_POLICIES for v in data.values()):
+                if self.path!='/api/demo' or set(data)!={'agent_a','agent_b'} or any(v not in available_policies for v in data.values()):
                     raise ValueError('Unknown demo request')
                 with lock:
                     if not can_launch(ledger):
@@ -185,6 +194,8 @@ async def serve(bundle: Path, output: Path, port: int=8765, games: int=2, second
         while True:
             data=await pending.get()
             if demo_sources()!=ledger['source']: raise ValueError('Source changed during demo; restart before collection')
+            if extra_model and sha256(extra_model)!=ledger['optional_reinforce_sha256']:
+                raise ValueError('Optional frozen model changed')
             ident=f'live-{ledger["requested"]+1}'
             while ident in replays:
                 ident+='-new'
@@ -197,12 +208,15 @@ async def serve(bundle: Path, output: Path, port: int=8765, games: int=2, second
             started=time.monotonic();path=output/ident
             config=RunConfig(**data,battles=1,seed=71000+ledger['requested'],timeout=60,run_timeout=75,turn_cap=300,
                 predictor=str((bundle/'predictor.json').resolve()) if any(v in {'switch-logistic','learned-score'} for v in data.values()) else None,
-                checkpoint_a=str((bundle/'checkpoint.json').resolve()) if data['agent_a']=='learned-score' else None,
-                checkpoint_b=str((bundle/'checkpoint.json').resolve()) if data['agent_b']=='learned-score' else None)
+                checkpoint_a=str((bundle/'checkpoint.json').resolve()) if data['agent_a']=='learned-score' else str(extra_model.resolve()) if data['agent_a']=='reinforce' else None,
+                checkpoint_b=str((bundle/'checkpoint.json').resolve()) if data['agent_b']=='learned-score' else str(extra_model.resolve()) if data['agent_b']=='reinforce' else None)
             try:
                 verify(bundle)
                 result=await run(config,path,True,spectator=Spectator(config.port,record))
                 audit=audit_predictions(path)
+                if 'reinforce' in data.values():
+                    from .reinforce_training import audit_run
+                    audit=audit_run(path)
                 if result['invalid_action_incidents'] or result.get('unexpected_client_warning_records') or result.get('server_crash_reports'):
                     raise ValueError('Demo action/protocol validation failed')
                 if result['crash'] or result['timeout'] or result['cancelled'] or result['not_started']:

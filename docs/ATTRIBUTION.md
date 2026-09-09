@@ -72,3 +72,14 @@ capacity from dispatched requests. The authorized replacement exposed a cap caus
 by the frozen heuristic's handling of a frozen active Pokémon; it was not retuned
 or rerun. Preserving that failure and distinguishing partial evidence from completed
 acceptance are part of the project's reproducibility work, not claims of strength.
+
+The separately authorized richer-policy extension uses standard Monte Carlo
+REINFORCE with a state-value baseline (Sutton and Barto, Chapter 13), bilinear
+softmax features, gradient clipping and projected SGD. No novelty is claimed for
+these algorithms. Its short analytic derivatives are implemented in NumPy and
+checked by finite differences. BattleMind contributes the player-visible legal
+action representation, conservative audited outcome joins, frozen rollout and
+archived-opponent orchestration, budget enforcement and reproducible evaluation.
+It reuses the project's unchanged V2 heuristic as a clipped initialization prior,
+not an imported strong agent. All experience comes from the official local engine;
+there is no external imitation dataset, model download or hosted training service.

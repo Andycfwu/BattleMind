@@ -2,6 +2,16 @@
 
 A local Pokémon Showdown player and experiment harness, now with a **V7 local animated viewer and retained-evidence catalog**. Runs on CPU, with no account, API key or paid service. The official engine owns the rules. BattleMind owns the observation boundary, policies, conservative recording, experiments and local demonstration shell.
 
+A separately authorized research extension adds **`reinforce`**, a compact
+851-parameter action-conditioned stochastic policy with an observer-only value
+baseline. It learns from completed local battle outcomes against fixed references
+and archived learner checkpoints. The new architecture's frozen initialization is
+its primary control; it is not presented as equivalent to V5. See the
+[algorithm and commands](docs/REINFORCE.md),
+[frozen experiment specification](docs/REINFORCE-EXPERIMENT.md), and
+[actual research results](docs/REINFORCE-RESULTS.md). Historical V1–V7 evidence,
+viewer defaults and the **incomplete V6 acceptance status** remain unchanged.
+
 ## Watch a battle
 
 This retained workspace already has the verified demonstration bundle:

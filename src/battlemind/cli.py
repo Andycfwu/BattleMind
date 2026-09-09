@@ -13,6 +13,12 @@ from .runner import RunConfig, run
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description="BattleMind: bounded local gen1ou baseline experiments")
     sub = root.add_subparsers(dest="command", required=True)
+    cmd = sub.add_parser('reinforce-run', help='Single-use bounded research extension: smoke or frozen main specification')
+    cmd.add_argument('--spec', type=Path, required=True)
+    cmd.add_argument('--output', type=Path, required=True)
+    cmd = sub.add_parser('reinforce-report', help='Read-only outcome, policy-gradient update and partition audit')
+    cmd.add_argument('--experiment', type=Path, required=True)
+    cmd.add_argument('--audit', action='store_true')
     cmd = sub.add_parser('evidence', help='Read-only consolidation of retained V1-V6 evidence')
     cmd.add_argument('--output', type=Path, required=True)
     cmd = sub.add_parser('demo-prepare', help='Package preselected retained public examples and compatible artifacts')
@@ -30,6 +36,7 @@ def parser() -> argparse.ArgumentParser:
     cmd.add_argument('--games', type=int, default=2)
     cmd.add_argument('--seconds', type=int, default=1800)
     cmd.add_argument('--recordings', type=Path, help='Finished public replay exports only; never raw/private logs')
+    cmd.add_argument('--reinforce-checkpoint', type=Path, help='Optional compatible frozen research policy; historical defaults unchanged')
     for name in ("doctor", "battle", "server"):
         cmd = sub.add_parser(name)
         cmd.add_argument("--config", type=Path, default=ROOT / "configs/smoke.json")
@@ -101,6 +108,14 @@ def parser() -> argparse.ArgumentParser:
 
 
 async def dispatch(args) -> tuple[dict, int]:
+    if args.command == 'reinforce-run':
+        from .reinforce_experiment import experiment
+        result=await experiment(args.spec,args.output)
+        return result, 0 if result['status']=='finished' else 1
+    if args.command == 'reinforce-report':
+        from .reinforce_experiment import report_experiment
+        result=report_experiment(args.experiment,args.audit)
+        return result, 0 if result['audit']['ok'] else 1
     if args.command == 'evidence':
         from .evidence import build_catalog
         result = build_catalog(args.output)
@@ -114,7 +129,7 @@ async def dispatch(args) -> tuple[dict, int]:
         return result, 0
     if args.command == 'demo-serve':
         from .demo_server import serve
-        return await serve(args.bundle,args.output,args.port,args.games,args.seconds,args.recordings), 0
+        return await serve(args.bundle,args.output,args.port,args.games,args.seconds,args.recordings,args.reinforce_checkpoint), 0
     if args.command == "adaptation-run":
         from .adaptation_experiment import run_adaptation
         result = await run_adaptation(args.output)

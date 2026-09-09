@@ -1,0 +1,33 @@
+{
+  "schema_version": "reinforce-spec-1",
+  "kind": "main",
+  "document": "docs/REINFORCE-EXPERIMENT.md",
+  "maximum_games": 2400,
+  "maximum_seconds": 3600,
+  "games": {
+    "training": 864,
+    "selection": 216,
+    "final": 576
+  },
+  "seconds": {
+    "training": 1600,
+    "selection": 500,
+    "final": 1100,
+    "overhead": 400
+  },
+  "updates": 12,
+  "candidates": [
+    0,
+    6,
+    12
+  ],
+  "actor_lr": 30.0,
+  "value_lr": 0.1,
+  "seed": 83000,
+  "teams": [
+    "configs/teams/ou-v1-a.txt",
+    "configs/teams/ou-v1-b.txt",
+    "configs/teams/ou-v2-c.txt",
+    "configs/teams/ou-v2-d.txt"
+  ]
+}

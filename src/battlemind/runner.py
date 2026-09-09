@@ -69,8 +69,8 @@ class RunConfig:
                 raise ValueError(f"Unknown policy: {agent}")
             if agent in {"switch-constant", "switch-context", "switch-logistic", "learned-score"} and not self.predictor:
                 raise ValueError("Switch-aware policies require --predictor")
-            if (agent == "learned-score") != (checkpoint is not None):
-                raise ValueError("Each learned-score side requires its own checkpoint; other policies take no checkpoint")
+            if (agent in {"learned-score", "reinforce"}) != (checkpoint is not None):
+                raise ValueError("Each learned-score/reinforce side requires its own checkpoint; other policies take no checkpoint")
 
 
 def policy_seed(seed: int, match: int, side: str) -> int:
@@ -191,8 +191,9 @@ class LocalPlayer(Player):
 
     def choose_move(self, battle: Battle) -> SingleBattleOrder:
         observation, mapping = snapshot(battle, self.trackers[battle.battle_tag])
+        action_evaluation = self.policy.act(observation) if hasattr(self.policy, "act") else None
         evaluation = self.policy.evaluate(observation) if hasattr(self.policy, "evaluate") else None
-        chosen = evaluation.chosen_action if evaluation else self.policy.choose(observation)
+        chosen = action_evaluation.chosen_action if action_evaluation else evaluation.chosen_action if evaluation else self.policy.choose(observation)
         command = resolve_action(chosen, observation, mapping)
         data = asdict(observation)
         scores = evaluation.scores if evaluation else self.policy.scores(observation) if hasattr(self.policy, "scores") else ()
@@ -202,6 +203,7 @@ class LocalPlayer(Player):
             "player": self.side, "observation": data, "legal_mapping": mapping,
             "chosen_action": chosen, "command": command, "action_scores": [asdict(s) for s in scores],
             **({"prediction_evaluation": asdict(evaluation)} if evaluation else {}),
+            **({"policy_evaluation": asdict(action_evaluation)} if action_evaluation else {}),
             "action_semantics": "local intention; commitment and execution require separate evidence"})
         self.state.decisions += 1
         return SingleBattleOrder(command)
@@ -350,9 +352,16 @@ async def run(config: RunConfig, output: Path, start_server: bool = False,
         _, counts = load_predictor(output / "predictor.json")
         predictor_meta = {"source_path": str(source.resolve()), "sha256": sha256(output / "predictor.json"),
                           "evaluation_updates": False}
-    checkpoints, checkpoint_meta = {}, {}
+    checkpoints, checkpoint_meta, reinforce_meta = {}, {}, {}
     for side, path in (("a", config.checkpoint_a), ("b", config.checkpoint_b)):
         if path is not None:
+            if getattr(config, "agent_" + side) == "reinforce":
+                from .reinforce import load_checkpoint as load_reinforce
+                destination = output / f"reinforce-{side}.json"
+                destination.write_bytes((ROOT / path).read_bytes())
+                checkpoints[side] = load_reinforce(destination)
+                reinforce_meta[side] = {"path": destination.name, "sha256": sha256(destination), "evaluation_updates": False}
+                continue
             if not isinstance(counts, PredictorBundle):
                 raise ValueError("Learned checkpoints require a compatible supervised predictor")
             destination = output / f"checkpoint-{side}.json"
@@ -364,6 +373,7 @@ async def run(config: RunConfig, output: Path, start_server: bool = False,
                 "predictor": predictor_meta,
                 **({"adaptation": memory_controller.metadata()} if memory_controller else {}),
                 **({"policy_checkpoints": checkpoint_meta} if checkpoint_meta else {}),
+                **({"reinforce_checkpoints": reinforce_meta} if reinforce_meta else {}),
                 "policies": {"a": {"name": config.agent_a, "version": make_policy(config.agent_a, config.seed, counts, checkpoints.get("a")).version},
                              "b": {"name": config.agent_b, "version": make_policy(config.agent_b, config.seed, counts, checkpoints.get("b")).version}},
                 "host": {"os": platform.platform(), "logical_cpus": psutil.cpu_count(),

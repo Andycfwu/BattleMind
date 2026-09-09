@@ -1,5 +1,10 @@
 # V5: what learns and how to explain it
 
+This document preserves the V5 design. Its historical results are in
+[MILESTONE5.md](MILESTONE5.md). The separately authorized, higher-capacity
+policy-gradient extension is documented in [REINFORCE.md](REINFORCE.md) with its
+own initialization, budgets and independent evaluation; it does not replace V5.
+
 V5 learns four numbers controlling action scores. It keeps V4's switch predictor,
 preprocessing, visible features and original scoring implementation frozen. The
 learned policy is a new class; V2/V3/V4 still run unchanged. Learning means an

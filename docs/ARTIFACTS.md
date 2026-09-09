@@ -88,3 +88,32 @@ every artifact and manifest by a local editor. Historical full-source audits sti
 require their historical code. Generated bundles, runs, datasets and models stay
 ignored. Preliminary development bundles have older renderer pins and are retained
 only as development output; the release artifact above is the supported import.
+
+## Separate richer-policy research archive
+
+The new `reinforce` model is not inserted into or substituted for the V7 release
+bundle. `runs/reinforce-smoke` retains the 48 engineering games and single smoke
+update. `runs/reinforce-main` retains the independently frozen initialization,
+c1…c12, selected checkpoint, batch/terminal-target records, all three experiment
+phases, source snapshot, source/model/configuration hashes, single-use ledger and
+reports. Exact results, hashes and sizes are listed in
+[REINFORCE-RESULTS.md](REINFORCE-RESULTS.md). All these generated files remain ignored.
+
+The new checkpoint format is safe `reinforce-checkpoint-1` JSON. A frozen policy
+needs its checkpoint plus compatible source/dependencies, not its training data.
+Auditing learning claims also needs all recorded runs and batch records.
+`source-snapshot` preserves the experiment's source closure for strict audits;
+copy it into a separate audit workspace if current source changes later. Do not
+overwrite working source or rewrite historical hashes to bypass a mismatch.
+Model compatibility and whole-experiment source checks are distinct.
+
+The original V4 predictor and selected V5 checkpoint are frozen reference-opponent
+inputs, copied and hashed without retraining. A new outcome-driven experiment
+cannot promise the same checkpoint: policy seeds do not control simulator RNG.
+Another `reinforce-run` needs separate authorization and a fresh directory; neither
+consumed ledger supports resume. A source-only clone lacks ignored checkpoints.
+
+`demo-serve --reinforce-checkpoint PATH` loads and copies an optional compatible
+model locally; it does not alter the historical bundle. The HTTP server serves
+only explicit public assets/replays, never models or raw observer/private records.
+Recorded verification uses zero demonstration games.

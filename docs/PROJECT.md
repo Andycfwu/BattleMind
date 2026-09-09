@@ -105,4 +105,25 @@ No screenshots, OCR, mouse automation, public ladder, player scraping, public ac
 
 ## Learning and engineering habits
 
+### Separately authorized research after V1–V7
+
+The richer policy extension is one CPU bilinear softmax actor with an observer-only
+value baseline, trained by terminal-outcome REINFORCE with archived self-play and
+fixed reference opponents. It is distinct from V4 supervised switch prediction,
+V5 four-parameter derivative-free optimization, and V6 cross-encounter behavioral
+adjustment. It adds no new generation, team construction, external data or human
+profiling. V1–V7 remain the historical roadmap; V6 acceptance remains incomplete.
+
+The new model starts from a fixed clipped V2 prior and zero learned coefficients,
+with no imitation data. Balanced frozen rollout batches feed offline outcome joins
+and one update per batch. Selection and final evaluation are fresh, disjoint and
+cannot update weights. Main allocations are 864/216/576 games and at most 3,600s;
+the separate engineering smoke is at most 48 games/300s. Consumed specifications
+cannot be resumed or repeated without another request. See
+[REINFORCE.md](REINFORCE.md), [the frozen design](REINFORCE-EXPERIMENT.md) and
+[observed evidence](REINFORCE-RESULTS.md). Any next research/evaluation/port is a
+separate decision, not an automatically executed milestone.
+
+### Ongoing engineering rules
+
 Prefer a small Python package and `poke-env`, versioned legal team fixtures, type hints, clear errors, configuration, and behavioral tests. Engine rules remain authoritative. Every milestone should explain the important paths in plain English and distinguish original work from reused infrastructure/algorithms/data. Keep training dependencies optional until actually needed. Inspect before editing, preserve unrelated work, and do not commit, push, deploy, or start prolonged workloads without a separate request.

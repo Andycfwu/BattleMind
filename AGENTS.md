@@ -1,5 +1,25 @@
 # BattleMind project rules
 
+- A separately authorized richer-policy research extension follows V1–V7. Read
+  `docs/REINFORCE.md`, `docs/REINFORCE-EXPERIMENT.md` and
+  `docs/REINFORCE-RESULTS.md` before extending it. `reinforce` is a NumPy bilinear
+  softmax actor with an observer-only value baseline and terminal-outcome
+  REINFORCE updates. Preserve all historical scorers/artifacts, including incomplete
+  V6 acceptance and the pre-extension status in `docs/MILESTONE7.md`.
+- Its single-use smoke/main specifications allocate 48/1,656 games respectively;
+  do not resume, repeat or add training after the consumed allocation. Main phases
+  are 864 training, 216 selection, 576 final, at most 3,600s including verification.
+  Training batches freeze learner/opponents; only completed, commitment-verified
+  learner episodes receive terminal rewards. Caps have no reward and may continue
+  independent audited games. Other blocking failures stop. No shaping, stale-policy
+  reuse, selection/final updates, extra teams or new generation without a request.
+- New frozen checkpoints may be evaluated or replay-audited without learning.
+  `reinforce-report --experiment runs/reinforce-main --audit` is read-only;
+  source compatibility remains strict. Never run historical training integration
+  suites casually. The new integration test audits retained real smoke evidence
+  and collects zero extra games. Optional viewer policy `reinforce` preserves
+  historical defaults and bundles.
+
 - V7 is the final planned milestone: local official animation, safe artifact bundles
   and read-only evidence consolidation. Read `docs/V7.md`, `docs/ARTIFACTS.md` and
   `docs/INTERVIEW.md`. Both V6 attempts remain incomplete; the previous status is

@@ -327,6 +327,52 @@ The expanded pool exposed a legitimate ambiguity: a request offered Hyper Beam w
 
 ## Accounting
 
+### Richer policy research records
+
+The separate `reinforce-bilinear-1` model consumes unchanged frozen snapshot 1.1
+values. Existing observation/request/label schemas and unknown suffix rules are
+preserved. A REINFORCE decision adds a `policy_evaluation` object to its existing
+attempt record: legal IDs in request order, probabilities, logits, chosen ID,
+observer-only value, RNG draw, feature version and checkpoint digest. The digest
+is orchestration/audit metadata; it is not a numerical feature. Per-run model
+copies are listed in `reinforce_checkpoints`, separately from V5 checkpoints.
+
+`reinforce-checkpoint-1` JSON stores actor shape 37×22, value shape 37, ordered
+features, float64 and norm limits, relevant source/runtime hashes, and separate
+training provenance. Parameters are deeply immutable at inference. Load failures,
+illegal support or nonfinite outputs raise errors; there is no random fallback.
+
+Offline `batches/targets-N.json` joins `SHA256(run.json):match`, the frozen
+checkpoint, that observer's decision IDs and decision-file hash to a terminal
+reward or exclusion. A target is never added to a pre-decision snapshot. Rewards
+are +1/0/-1 for genuine win/draw/loss. Caps/failures and any episode with an unknown
+learner commitment have null reward and an explicit reason. Updates reject stale
+checkpoints, duplicated battles, non-training phases and missing terminal rewards.
+Selection/final records never enter training. `updates.json` and per-batch records
+retain the frozen pool, sources, admitted keys, losses, gradients and parameter
+deltas. The audit reconstructs probabilities/draws/choices and each actual update.
+
+`reinforce-ledger-1` is separate from historical V5/V6 ledgers. Planned phase
+capacity is reserved before training, including final capacity. Each 24-game cell
+is persistently reserved before dispatch; only dispatch increases actual requests.
+Closed phase clocks and experiment finish are idempotent. `report.json` separates
+requested/recorded/completed/caps/never-requested counts; no unused slots become
+losses. Main `collection_stop_seconds`, phase `seconds`, total and overhead are
+monotonic durations. Later read-only verification does not extend or rewrite them;
+its separately measured duration must still fit the protected overhead/aggregate
+allocation. Resume, refunds, retries and borrowing are unsupported.
+
+An ordinary cap contributes no actor or critic reward and does not cancel later
+independent scheduled games after successful cleanup/audits. This is the newly
+predeclared research rule, **not a retroactive change to V6's consumed experiment**.
+Unexpected warnings/protocol errors, invalid actions, crashes/timeouts or audit
+failures stop the new experiment. Completed-only estimates are reported with cap
+rates and unknown-outcome sensitivity bounds; those bounds are not imputed rewards.
+
+See [REINFORCE.md](REINFORCE.md) and [REINFORCE-EXPERIMENT.md](REINFORCE-EXPERIMENT.md).
+
+### Shared terminal accounting
+
 Only compatible terminal outcomes from **both** players without any earlier failure count as `completed`. Completed outcomes are A win, B win, or draw. Win rate uses all completed games as denominator, with draws contributing no win. Truncations, timeouts, crashes, cancellations, and not-started scheduled games are separate. The run aborts after a crash/timeout/cancellation; remaining schedule rows stay `not_started`. Caps can continue to the next scheduled match.
 
 At a turn cap, the runner declines decisions for the next turn and cleans up with a forfeit. The observed boundary turn can therefore be cap + 1; no policy decision beyond the cap is sent. Timeout and error cleanup may also produce an engine forfeit result. These terminal messages are retained for audit but never converted to wins. Invalid/unavailable choices are visible incidents and abort the match, with no library random fallback.

@@ -1,5 +1,11 @@
 # Opponent prediction: V3 counts and V4 supervised training
 
+The separately authorized [richer policy research](REINFORCE.md) learns action
+preferences from terminal outcomes. It does not retrain or consume this logistic
+predictor as a new-model feature. The unchanged V5 reference opponent still uses
+the original V4 artifact. Supervised prediction, policy-gradient learning and V6
+public-history adaptation remain separate mechanisms and experiments.
+
 V3 estimates **P(opponent voluntarily switches | opponent has a meaningful move-or-switch choice)**. It compares an overall frequency with conditional frequencies, then uses either estimate in the same action-scoring policy. It does not train a classifier, read external replays, adapt to an individual, or update during evaluation.
 
 ## Observation and target are different inputs
