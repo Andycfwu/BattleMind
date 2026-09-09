@@ -1,0 +1,8 @@
+{
+  "python": "3.14.3",
+  "node": "v24.19.0",
+  "pnpm": "11.19.0",
+  "poke_env": "0.16.1",
+  "showdown_commit": "2f5b273925862ac242b419086c1e7a8868b51da1",
+  "showdown_version": "0.11.11"
+}

@@ -1,0 +1,41 @@
+Alakazam
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Psychic
+- Seismic Toss
+- Thunder Wave
+- Recover
+
+Tauros
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Body Slam
+- Hyper Beam
+- Blizzard
+- Earthquake
+
+Snorlax
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Body Slam
+- Earthquake
+- Hyper Beam
+- Self-Destruct
+
+Chansey
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Ice Beam
+- Thunderbolt
+- Soft-Boiled
+- Thunder Wave
+
+Exeggutor
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Psychic
+- Sleep Powder
+- Stun Spore
+- Explosion
+
+Rhydon
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Earthquake
+- Rock Slide
+- Body Slam
+- Substitute

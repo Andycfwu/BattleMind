@@ -1,0 +1,14 @@
+{
+  "format": "gen1ou",
+  "agent_a": "random",
+  "agent_b": "max-base-power",
+  "battles": 2,
+  "seed": 42,
+  "concurrency": 1,
+  "turn_cap": 300,
+  "timeout": 60,
+  "run_timeout": 600,
+  "port": 8000,
+  "showdown": ".local/pokemon-showdown",
+  "teams": ["configs/teams/ou-v1-a.txt", "configs/teams/ou-v1-b.txt"]
+}

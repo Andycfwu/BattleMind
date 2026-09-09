@@ -1,0 +1,41 @@
+Jynx
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Lovely Kiss
+- Blizzard
+- Psychic
+- Rest
+
+Dragonite
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Wrap
+- Agility
+- Blizzard
+- Hyper Beam
+
+Jolteon
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Thunderbolt
+- Thunder Wave
+- Double Kick
+- Rest
+
+Snorlax
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Body Slam
+- Earthquake
+- Rest
+- Amnesia
+
+Chansey
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Ice Beam
+- Thunderbolt
+- Thunder Wave
+- Soft-Boiled
+
+Tauros
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Body Slam
+- Blizzard
+- Earthquake
+- Hyper Beam

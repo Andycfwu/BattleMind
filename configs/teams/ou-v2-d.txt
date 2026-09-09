@@ -1,0 +1,41 @@
+Zapdos
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Thunderbolt
+- Drill Peck
+- Thunder Wave
+- Rest
+
+Cloyster
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Blizzard
+- Clamp
+- Explosion
+- Rest
+
+Victreebel
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Razor Leaf
+- Sleep Powder
+- Wrap
+- Swords Dance
+
+Starmie
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Surf
+- Thunderbolt
+- Thunder Wave
+- Recover
+
+Golem
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Earthquake
+- Rock Slide
+- Body Slam
+- Explosion
+
+Tauros
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Body Slam
+- Blizzard
+- Earthquake
+- Hyper Beam

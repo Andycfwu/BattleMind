@@ -1,0 +1,41 @@
+Starmie
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Surf
+- Thunderbolt
+- Blizzard
+- Recover
+
+Tauros
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Body Slam
+- Hyper Beam
+- Blizzard
+- Earthquake
+
+Snorlax
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Body Slam
+- Blizzard
+- Earthquake
+- Self-Destruct
+
+Chansey
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Ice Beam
+- Thunderbolt
+- Soft-Boiled
+- Thunder Wave
+
+Exeggutor
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Psychic
+- Sleep Powder
+- Mega Drain
+- Explosion
+
+Gengar
+EVs: 252 HP / 252 Atk / 252 Def / 252 SpA / 252 SpD / 252 Spe
+- Thunderbolt
+- Night Shade
+- Hypnosis
+- Explosion
