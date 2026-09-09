@@ -1,5 +1,6 @@
 import asyncio
 import json
+import pytest
 
 from poke_env import AccountConfiguration
 
@@ -7,12 +8,21 @@ from battlemind.reporting import JsonlWriter
 from battlemind.runner import LocalPlayer, MatchState
 
 
-def test_batched_future_message_is_not_in_predecision_snapshot(tmp_path, turn_request, battle, tracker):
+@pytest.mark.parametrize("policy_name", ["random", "switch-context", "switch-logistic"])
+def test_batched_future_message_is_not_in_predecision_snapshot(tmp_path, turn_request, battle, tracker, policy_name):
     async def exercise():
         decisions = JsonlWriter(tmp_path / "decisions.jsonl")
         events = JsonlWriter(tmp_path / "events.jsonl")
         state = MatchState(0, 30, decisions, events)
-        player = LocalPlayer(policy_name="random", seed=42, side="a", state=state,
+        from battlemind.prediction import Context, estimate_counts
+        counts = estimate_counts([(Context("other", "healthy", "resisted"), 1)] * 10)
+        if policy_name == "switch-logistic":
+            from battlemind.adapter import snapshot_request
+            from battlemind.supervised import LogisticModel, PredictorBundle, features_from_snapshot
+            from battlemind.supervised_training import fit_preprocessor
+            prep = fit_preprocessor([features_from_snapshot(snapshot_request(turn_request, 1, tracker)[0])])
+            counts = PredictorBundle(counts, LogisticModel(prep, (0.0,) * len(prep.columns), 0.0, 0.1), "a" * 64)
+        player = LocalPlayer(policy_name=policy_name, counts=counts, seed=42, side="a", state=state,
                              account_configuration=AccountConfiguration("offline", None),
                              start_listening=False, loop=asyncio.get_running_loop())
         player._battles[battle.battle_tag] = battle

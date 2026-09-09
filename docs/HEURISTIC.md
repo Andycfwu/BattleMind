@@ -1,5 +1,7 @@
 # Gen1HeuristicAgent v1
 
+This is the frozen V2 reference. V3 adds a separate switch-aware policy described in [PREDICTION.md](PREDICTION.md); this policy's implementation and weights are unchanged.
+
 The policy in `src/battlemind/heuristic.py` is a handwritten, deterministic utility rule. It accepts one frozen `DecisionSnapshot`, scores only its legal choices, and returns the first maximum in legal request order. It has no access to the runner, team files, account names, other client's request, or submitted action. RandomLegalAgent and MaxBasePowerAgent remain unchanged comparison policies.
 
 These constants were chosen as understandable starting rules and frozen before the reported comparisons. They were not fitted to data. The resulting number is **utility**, not damage, expected HP loss, a simulator evaluation, or win probability.

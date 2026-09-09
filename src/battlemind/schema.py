@@ -61,3 +61,19 @@ class DecisionSnapshot:
     gen1_derived_counters: None = None
     maybe_locked: bool = False
     maybe_disabled: bool = False
+
+
+def snapshot_from_dict(data: dict) -> DecisionSnapshot:
+    """Restore the frozen policy boundary from an audited observation, not a log row."""
+    def pokemon(value: dict) -> PokemonView:
+        return PokemonView(**{**value, "health": Health(**value["health"]),
+            "moves": tuple(value["moves"]), "boosts": tuple(tuple(b) for b in value["boosts"]),
+            "hidden_moves": None if value["hidden_moves"] is None else tuple(value["hidden_moves"])})
+
+    if data["schema_version"] not in {"1.0", "1.1"} or data["format"] != "gen1ou":
+        raise ValueError("Unsupported observation schema or format")
+    return DecisionSnapshot(**{**data,
+        "own_team": tuple(pokemon(p) for p in data["own_team"]),
+        "opponent_revealed": tuple(pokemon(p) for p in data["opponent_revealed"]),
+        "legal_actions": tuple(LegalAction(**a) for a in data["legal_actions"]),
+        "public_history": tuple(PublicEvent(**{**e, "values": tuple(e["values"])}) for e in data["public_history"])})

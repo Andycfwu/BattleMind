@@ -1,6 +1,6 @@
 # BattleMind project rules
 
-- Read `README.md`, `docs/STATUS.md`, and `docs/PROJECT.md` before extending work. Milestones 1 and 2 are implemented; do not add ML, a predictor, self-play, or a frontend without a new request.
+- Read `README.md`, `docs/STATUS.md`, `docs/PROJECT.md`, `docs/PREDICTION.md` and `docs/SCHEMA.md` before extending work. V1–V4 include frozen count/logistic prediction and supervised training from audited local records. Do not add external replay ingestion, self-play learning, individual-opponent profiles or a frontend without a new request. Preserve V3's negative evidence in `docs/MILESTONE3.md`.
 - Inspect the directory and any Git changes before editing. Preserve unrelated work. Do not commit, push, deploy, or launch extended workloads without the user's request.
 - All battles and services stay on `127.0.0.1`. Never use the public ladder, external authentication, cloud accounts, tunnels, hosted models, or paid APIs. Do not relax the reviewed server binding.
 - Keep concurrency 1 and bounded battle/turn/time budgets. Never count cleanup forfeits, failures, or caps as wins.
@@ -10,6 +10,11 @@
 - Keep the live attempt journals separate per player. Only the post-match recorder may combine choices and read privileged official end logs. An attempted send is not a committed or executed action. Match exact engine input sequences; preserve unknown suffixes after mismatches. Pair opponent labels to the observer's snapshot, never the chooser's private observation. Read `docs/SCHEMA.md` before changing this boundary.
 - Preserve wrapper warnings. Only the documented 0.16.1 Wrap/Clamp trailing-annotation warning is recognized by the audit; unexpected warnings/errors require investigation. No silent action retry.
 - Freeze heuristic weights before comparisons. Use complete four-game blocks per unordered team pair (24 games for four teams) to balance assignments and player sides. Do not tune on a reported comparison or claim held-out strength.
+- V2 `Gen1HeuristicAgent` weights stay frozen. V3 constant and conditional variants share the same `SwitchAwareAgent` scoring. Prediction uses only observer snapshots; post-battle target eligibility is never an online input. Evaluation cannot update counts.
+- V4 logistic uses the same scoring, with train-only preprocessing and a declared three-lambda validation search. Fair counts fit exactly the same training rows. Bundle policies receive frozen parameters/digest, never provenance or eligibility. No pickle or evaluation-time updates. Runner-b identity is offline population selection only; sides still swap.
+- Follow `docs/V4-EXPERIMENT.md`: fixed opponents, 24-game cells, aggregate collection/final ceiling 600 games/900 seconds and persistent single-use reservations. No tuning or retries on final results. Generated data/models remain ignored. Changes to fixed opponents or scoring require a new experiment specification.
+- Dataset identities are run-manifest SHA-256 plus match index. Keep both perspectives/all turns together. Estimate counts only from `development_fit`; previously reported M2 `development_check` is not an untouched test. Fresh evaluation must not overlap any development battles. Preserve exclusions and source hashes.
+- Benchmark every version as developed. Current roadmap: V1 legal matches, V2 basic strategy, V3 opponent prediction, V4 supervised training from local records, V5 self-play learning, V6 individual adaptation, V7 consolidated benchmarks. Do not implement the next version without a request.
 - Source fixture teams/versions/configs are tracked candidates. `.local/`, `.venv/`, `runs/`, datasets, and weights remain ignored. Preserve third-party notices.
 - Use `requirements.lock` and `configs/showdown-pnpm-lock.yaml`; update version records with intentional dependency changes. New runs use fresh output directories and record content hashes because this workspace may have no Git repository.
 
@@ -28,6 +33,16 @@ Verified PowerShell commands, from project root:
 .\.venv\Scripts\python.exe -m battlemind report --run runs/ACTUAL_DIRECTORY
 .\.venv\Scripts\python.exe -m battlemind battle --start-server --config configs/milestone2.json --agent-b random --output runs/NEW_DIRECTORY
 .\.venv\Scripts\python.exe -m battlemind report --run runs/ACTUAL_M2_DIRECTORY --audit
+.\.venv\Scripts\python.exe -m battlemind dataset --runs runs/m2-comparison-random runs/m2-comparison-max-base-power --output datasets/NEW_DEVELOPMENT --seed 2026
+.\.venv\Scripts\python.exe -m battlemind predictor-fit --dataset datasets/NEW_DEVELOPMENT --output models/NEW_COUNTS.json
+.\.venv\Scripts\python.exe -m battlemind predictor-evaluate --dataset datasets/NEW_DEVELOPMENT --predictor models/NEW_COUNTS.json --partition development_check --output runs/NEW_QUALITY
+.\.venv\Scripts\python.exe scripts/benchmark-v3.py --predictor models/NEW_COUNTS.json --output runs/NEW_V3_BENCHMARK
+.\.venv\Scripts\python.exe -m battlemind supervised-dataset --runs runs/integration-v4-73e081637f/recorded --output datasets/NEW_V4_DATA
+.\.venv\Scripts\python.exe -m battlemind supervised-train --dataset runs/v4-development/development-data --output models/NEW_V4_MODEL.json
+.\.venv\Scripts\python.exe -m battlemind supervised-evaluate --dataset runs/v4-acceptance/evaluation-data --predictor models/v4-supervised.json --partition evaluation --output runs/NEW_V4_QUALITY
+.\.venv\Scripts\python.exe -m battlemind report --run runs/v4-acceptance/logistic-vs-switch-moderate --audit
 ```
+
+Load `scripts/env.ps1` in each new PowerShell terminal before server commands: the system PATH may select Node 24.20.0, while the pinned bundle is 24.19.0. Keep the version check. The historical V3 script uses 144 games/600 seconds. V4 uses `scripts/experiment-v4.py collect` then `final`, sharing one `--budget` ledger; its actual commands and 432-game evidence are in `docs/STATUS.md`. Never repeat final games just to obtain better outcomes.
 
 Do not replace real-run metrics with fixtures. Report observed counts, failures, actual artifact paths, unsupported behavior, and the one next milestone. Explain code in plain English so the student can defend their own contributions.

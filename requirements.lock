@@ -6,6 +6,7 @@ Farama-Notifications==0.0.6
 gymnasium==1.3.0
 idna==3.19
 iniconfig==2.3.0
+# Also the optional V4 training dependency; version unchanged from V3.
 numpy==2.5.2
 orjson==3.12.0
 packaging==26.3

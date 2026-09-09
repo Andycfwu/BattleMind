@@ -39,7 +39,19 @@ class MaxBasePowerAgent:
         return actions[0].id
 
 
-def make_policy(name: str, seed: int) -> Policy:
+POLICY_NAMES = ("random", "max-base-power", "gen1-heuristic", "switch-constant", "switch-context",
+                "switch-logistic", "switch-moderate", "switch-active")
+
+
+def make_policy(name: str, seed: int, counts=None) -> Policy:
+    if name in {"switch-moderate", "switch-active"}:
+        from .opponents import SwitchingHeuristicAgent
+        return SwitchingHeuristicAgent(40 if name == "switch-moderate" else 0)
+    if name in {"switch-constant", "switch-context", "switch-logistic"}:
+        from .anticipation import SwitchAwareAgent
+        if counts is None:
+            raise ValueError("Switch-aware policies require a frozen predictor artifact")
+        return SwitchAwareAgent(counts, {"switch-constant": "constant", "switch-context": "conditional", "switch-logistic": "logistic"}[name])
     if name == "gen1-heuristic":
         from .heuristic import Gen1HeuristicAgent
         return Gen1HeuristicAgent()

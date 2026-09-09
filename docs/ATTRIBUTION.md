@@ -9,3 +9,16 @@
 - BattleMind's implementation work consists of the immutable observation schema, public-only projection, stable request mapping, heuristic and baseline boundary, separate journals, official committed-input alignment, conservative label/execution evidence, balanced schedule, bounded local runner/lifecycle, audit metadata, error accounting, and behavioral tests. The student should understand and be able to explain these contributions; generated code alone is not a claim of personal research novelty.
 
 No external datasets, replay corpora, model checkpoints, or strong-agent code have been incorporated. Future Metamon or other integrations must record their exact version, license, sizes, and assumptions before use. Pokémon names and game content belong to their respective rights holders.
+
+V3 adds project-written audited dataset joins, battle-level splits, constant and conditional frequency estimation, mixture utility scoring, frozen-artifact audits and controlled benchmarks. Beta/Laplace smoothing, shrinkage toward a global frequency, Brier score, log loss, calibration bins, Wilson intervals and bootstrap resampling are standard statistical methods, not claimed as novel algorithms. Counts are estimated from the project's local M2 games; no classifier or externally trained model was imported. Handwritten rules and empirical estimates are explicitly distinguished in `PREDICTION.md`.
+
+V4 implements standard L2 logistic regression and Newton optimization using the
+already-pinned NumPy. The algorithm follows established likelihood/gradient/Hessian
+methods, explained in [CMU's logistic regression notes](https://stat.cmu.edu/~cshalizi/dm/20/lectures/07/lecture-07.html)
+and [regularization lectures](https://www.cs.cmu.edu/~mgormley/courses/10601-s25/slides/lecture10-reg.pdf).
+No external implementation was copied and no optimizer novelty is claimed. The
+project work is the observer-only feature design, train-only preprocessing,
+audited data plumbing, safe frozen bundle, fair baseline fitting, common-scoring
+integration, budget enforcement and empirical comparison. The classifier learns
+from this project's recorded local choices. Fixed threshold opponents reuse V2's
+utilities; they are simple project-written variants, not imported strong agents.

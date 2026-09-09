@@ -1,6 +1,6 @@
 # Player boundary and run records
 
-Milestone 2 uses observation schema **1.1**, decision/battle/label schema **2.0**, and the backward-compatible accounting summary schema **1.0** with additional fields. Milestone 1 logs retain their original schemas and have no verified labels.
+V2 uses observation schema **1.1**, decision/battle/label schema **2.0**, and accounting summary schema **1.0** with additional fields. V3 keeps that observation and label boundary, adds decision schema **3.0** for prediction decisions, and adds separate dataset/count/probability-report schemas. Legacy policy decisions remain 2.0. Historical V1 logs retain their original schemas and have no verified labels.
 
 All policy-visible values are nested frozen dataclasses containing primitives and tuples. The policy interface is `choose(DecisionSnapshot) -> str`. The adapter alone sees the player's current request. `PublicTracker` sees only messages delivered to that client and applies a small allowlist; it is a protocol projection, not a battle engine. Its mutable records are copied before every decision.
 
@@ -50,7 +50,46 @@ Verified labels distinguish `move_choice`, `voluntary_switch`, `forced_replaceme
 
 Binary `voluntary_switch_target` is 1 or 0 only when the verified choosing player had both an ordinary move and a switch, with no engine action or uncertain lock/disable flag. Forced replacements and Fight/Recharge/Struggle cases are excluded; uncertain legality gives `null`. This conservative eligibility may discard real voluntary choices. It avoids pretending that every turn offered a genuine move/switch decision.
 
-For future opponent prediction, the label points to `observer_decision_id` and `observer_snapshot_sha256`: the **other player's** pre-decision observation at the same committed decision point. Request IDs differ between players. Pairing requires exactly one verified ordinary request per side on that turn, with adjacent official committed input entries. Forced/wait cases have no synthetic observer decision. Target counts include only completed battles and valid pairs. A later dataset builder must use this observer join, exclude recorder-only fields, and split by whole battle. This milestone does not construct or train a dataset.
+For opponent prediction, the label points to `observer_decision_id` and `observer_snapshot_sha256`: the **other player's** pre-decision observation at the same committed decision point. Request IDs differ between players. Pairing requires exactly one verified ordinary request per side on that turn, with adjacent official committed input entries. Forced/wait cases have no synthetic observer decision. Target counts include only completed battles and valid pairs. V3's dataset builder uses this observer join, excludes recorder-only fields from features, and splits by whole battle; see `PREDICTION.md`.
+
+## V3 artifacts
+
+- `prediction_evaluation` in a 3.0 decision records the numeric probability, mode, visible context, supporting counts/fallback, application flag, public/anonymous destination weights, candidate stay/switch/mixture utility, chosen action, and alternate constant/conditional/V2 choices on the same frozen snapshot. It never records a live opponent choice as a feature.
+- `predictor.json` in each V3 run is an unchanged copy of the input count artifact. `run.json` records its SHA-256 and `evaluation_updates=false`. Only its frozen count table enters a policy; fit battle identities and provenance do not.
+- A dataset has `examples.jsonl`, `exclusions.jsonl`, and `manifest.json` (`v3-dataset-1`). Example rows contain three visible context features, the binary target and recorder-only join/provenance fields. Only `features` enters the predictor. Split membership uses run-manifest hash plus match identity and keeps whole battles intact.
+- A count artifact (`v3-counts-1`) records frozen global/context counts, smoothing configuration, feature definitions, fit/development membership and source hashes. It is an empirical frequency model, not a trained classifier.
+- A probability report has `predictions.jsonl` and `summary.json` (`v3-probability-report-1`) with class balance, coverage/exclusions, Brier score, log loss, calibration and battle-level uncertainty. Eligibility comes from post-battle labels only; it is not copied into live policy inputs.
+- A benchmark root has `freeze.json`, six run directories, `evaluation-dataset/`, `probability-quality/`, `summary.json` and `artifact-hashes.json`. Existing runs and models are never overwritten. `report --audit` additionally recomputes V3 prediction evaluations from the saved snapshot and frozen count table.
+
+## V4 supervised extensions
+
+`v4-dataset-1` retains the complete audited V3 join in `audited-context/` and adds
+`visible-logistic-v1` vectors to the paired observer examples. The original three
+categories must still agree. `target_player`, `target_policy` and `observer_policy`
+are offline grouping fields only. Feature extraction accepts a `DecisionSnapshot`,
+never the joined row. All other identity/request/hash/target fields are preserved.
+Exclusions retain their original reason and partition and add target grouping
+metadata. The manifest records full and primary-population balances, exclusions,
+source hashes and the audited intermediate manifest hash. Primary means runner-b
+eligible decisions, not whichever engine side happens to be p2.
+
+`v4-supervised-1` is a plain JSON bundle of a frozen `CountTable` and logistic
+coefficients/intercept/preprocessing. It includes feature definitions, encoded
+column order, regularization search/convergence, train/validation/development keys,
+selected-population hashes/balance, software, source hashes and training resources.
+No source or label identity is part of `PredictorBundle` passed to policies.
+Datasets and models remain ignored generated files; unsupported schemas and
+train/evaluation overlap fail explicitly.
+
+V4 extends the 3.0 decision's `prediction_evaluation` with `logistic_choice`,
+`predictor_version`, `predictor_sha256` and `alternate_probabilities`. Existing
+fields and scoring semantics remain compatible. The raw snapshot is still 1.1.
+The prediction's count-support fields refer to the fair baseline counts, including
+when mode is logistic; they are not confidence or coefficient estimates.
+`v4-probability-report-1` includes all three probabilities per eligible example,
+group metrics, primary and full exclusions, calibration support and paired
+whole-battle resampling. Run/decision/evidence hashes detect accidental changes;
+they are not cryptographic authentication against a malicious local editor.
 
 ## Execution evidence and auditing
 

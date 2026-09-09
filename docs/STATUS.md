@@ -1,124 +1,238 @@
-# Status — Milestone 2 verified
+# Status — V4 verified; better probabilities, battle benefit inconclusive
 
-Verified on 2026-09-05. **Milestone 2 is implemented:** a transparent Gen 1 heuristic, four legal versioned teams, and separate post-commit intended-choice labels with explicit unknowns. No ML, predictor, training, self-play or frontend was added. Historical Milestone 1 evidence is preserved in [MILESTONE1.md](MILESTONE1.md).
+Verified 2026-09-09. **Supervised training and frozen inference work. Logistic
+regression improved probability estimates over both fair baselines on the declared
+fixed mixture. It did not establish a battle-result improvement.** Original V3
+findings are preserved verbatim in [MILESTONE3.md](MILESTONE3.md), with earlier
+evidence in [MILESTONE1.md](MILESTONE1.md) and [MILESTONE2.md](MILESTONE2.md).
 
-## Implemented behavior
+## Implemented changes
 
-- `Gen1HeuristicAgent` consumes only frozen snapshots. It scores public power/accuracy/STAB/type information, explicit healing/status/setup rules and conservative switching utility. Scores and reasons are logged. It never calculates exact damage or effective stats; [HEURISTIC.md](HEURISTIC.md) specifies every rule and limitation.
-- RandomLegalAgent and MaxBasePowerAgent remain available, with their original policy behavior.
-- The four-team schedule covers six unordered pairs, both assignments and both challenger sides: 24 games per comparison. Each policy uses each team six times and occupies actual engine side p1/p2 twelve times each.
-- Separate per-player live journals are combined only after both clients stop. The recorder verifies exact intended-choice sequences against the official engine's committed `inputLog`. Verified opponent targets point to the observer's simultaneous frozen snapshot, never the opponent's private observation. Missing or mismatched evidence stays unknown.
-- Forced replacements, voluntary switches, ordinary moves, engine actions and uncertainty remain distinct. Execution evidence is recorded separately: announcement, observed switch, inability to act, no announcement, or unknown. A move announcement does not prove a hit or effect.
-- `report --audit` rebuilds labels from saved evidence and checks snapshot/end-log hashes, legal mappings, submissions and label counts. Full boundary details are in [SCHEMA.md](SCHEMA.md).
+- `supervised.py`: compact observer-only features, train-fitted immutable
+  preprocessing, safe JSON logistic coefficients and frozen inference.
+- `supervised_data.py`: V4 features layered over the existing audited observer
+  join, with whole-battle partitions, hashes, exclusions and offline grouping.
+- `supervised_training.py`: deterministic L2 logistic regression with tested
+  gradient/Hessian, bounded Newton optimization and three-strength validation
+  selection. Fair constant/count baselines use exactly the same training rows.
+- `supervised_report.py`: Brier/log loss, supported calibration bins, target and
+  observer groups, exclusions/coverage, paired whole-battle bootstrap differences.
+- `anticipation.py`: separate `switch-logistic` source using the same existing
+  candidate stay/switch scoring; all three probabilities and alternate choices are
+  logged and audited against the frozen bundle.
+- `opponents.py`: fixed V2 utility variants requiring switch gain >40 or >0,
+  retaining the two-turn cooldown. Original V2 threshold 80 and all four teams are
+  unchanged by content hash. No strong-agent implementation was imported.
+- CLI commands, [pre-collection specification](V4-EXPERIMENT.md), bounded
+  `scripts/experiment-v4.py`, tests, schema and interview explanations.
 
-## Team pool
+Package is 0.4.0. Python 3.14.3 / Node 24.19.0 / poke-env 0.16.1 / official
+Showdown `2f5b273925862ac242b419086c1e7a8868b51da1` are unchanged. NumPy 2.5.2,
+already locked, is now declared in the optional training extra. No new package
+download was needed for ML. No external replay ingestion, self-play learning,
+individual profiles, frontend, hosted models, public ladder or GPU.
 
-All four six-Pokémon files passed the pinned official `gen1ou` validator. Existing v1 files were preserved. These are project-assembled fixtures using familiar sets, not optimized or comprehensive metagame coverage.
+## Development and frozen model
 
-| File | Species | Decisions exercised |
-|---|---|---|
-| `configs/teams/ou-v1-a.txt` | Alakazam, Tauros, Snorlax, Chansey, Exeggutor, Rhydon | Recovery, fixed damage, sleep, self-KO, Ground immunity |
-| `configs/teams/ou-v1-b.txt` | Starmie, Tauros, Snorlax, Chansey, Exeggutor, Gengar | Water coverage, Ghost immunity, sleep, fixed damage |
-| `configs/teams/ou-v2-c.txt` | Jynx, Dragonite, Jolteon, Snorlax, Chansey, Tauros | Lovely Kiss, Wrap, Agility, Amnesia, Rest, Double Kick |
-| `configs/teams/ou-v2-d.txt` | Zapdos, Cloyster, Victreebel, Starmie, Golem, Tauros | Clamp/Wrap, sleep, Swords Dance, recovery, type matchups |
+Actual collection: **144/144 completed**, 78 observer wins, 64 losses, 2 draws;
+zero invalid actions, failures, caps, timeouts or warnings. Two fixed observers
+(V2 and original V3 constant) faced three fixed target opponents, with all team
+assignments and sides balanced. Target switch rates were 8.05% (V2), 14.26%
+(moderate) and 21.89% (active). No M2/V3 recorded examples were reused for fitting;
+V3's artifact defined one fixed observer only.
 
-SHA-256 values, in that order:
+| Partition | Battles | Eligible primary examples | Switches | Battles with switches |
+|---|---:|---:|---:|---:|
+| Train | 108 | 2,615 | 388 | 107 |
+| Validation | 36 | 938 | 140 | 35 |
 
-```text
-84196a5540d751c54b7d5a9475a2b56f471a34f7f453330a8e65ea689c5f1e9e
-e438a6a32cf4393a40c25d9ee61e8c83a140f59abd26292a499770aa73d164a5
-08740397a02db1aab46df3615c8780801445b50d609f57d641a223926c91cda9
-ba1d05fc73c3e377772147c11659886340d3cc4b72df7683bfd3156d0a963b25
-```
+Every turn, both perspectives and exclusions inherit the run-hash-plus-match
+partition. Primary selection uses runner-b targets only, entirely offline. The
+audit confirmed zero overlap between all 144 development and 288 final battles.
+Fitting on the final evaluation dataset was explicitly rejected.
 
-The saved diagnostic [runs/m2-doctor.json](../runs/m2-doctor.json) records all four validations, public-table checks, pinned Python 3.14.3 / poke-env 0.16.1 / Node 24.19.0 / Showdown commit `2f5b273925862ac242b419086c1e7a8868b51da1`, and the successful loopback handshake. BattleMind is now version 0.2.0; no runtime dependencies were added. `pip check` passed.
+Selected lambda: **0.01** from the declared 0.01/0.1/1.0 search. Validation log
+losses were respectively 0.253196 / 0.303456 / 0.388524. It converged in 6 Newton
+steps, gradient infinity norm 9.06e-9. There was no validation refit, class
+reweighting, resampling, recalibration or final-result tuning. Frozen global
+frequency is 389/2617 = 0.1486435. The logistic model has 26 encoded coefficients
+and an intercept; the complete provenance JSON is 39,656 bytes.
 
-## Actual bounded comparisons
+Validation Brier/log loss: constant 0.126977/0.421414, conditional
+0.120732/0.397954, logistic 0.081312/0.253196. This is model-selection evidence,
+separate from fresh final results.
 
-Policy A was the same frozen `gen1-heuristic-v1` in both runs. Configuration: `configs/milestone2.json`, seed 2026, concurrency 1, turn cap 300, match timeout 60 seconds, run limit 600 seconds. The simulator RNG is not controlled by this seed. No heuristic weights were tuned after seeing these results.
+## Fresh final probability results
 
-| Measure | Versus random | Versus MaxBasePower |
+Primary population: **7,377 eligible opponent decisions, 1,087 switches (14.735%),
+288 battles, 279 battles with a switch**, pooled over the declared fixed mixture.
+Both baselines and logistic were evaluated on exactly these same examples.
+
+| Frozen probability source | Brier ↓ | Log loss ↓ |
 |---|---:|---:|
-| Requested / completed | 24 / 24 | 24 / 24 |
-| Heuristic wins / losses / draws | 24 / 0 / 0 | 22 / 2 / 0 |
-| Completed-game heuristic win rate | 100% (24/24) | 91.67% (22/24) |
-| Descriptive 95% Wilson interval | 86.20–100% | 74.15–97.68% |
-| Invalid actions | 0 | 0 |
-| Caps / timeouts / crashes / cancellations | 0 / 0 / 0 / 0 | 0 / 0 / 0 / 0 |
-| Missing / not-started matches | 0 / 0 | 0 / 0 |
-| Server crash reports | 0 | 0 |
-| Known wrapper warning records | 8 | 0 |
-| Unexpected client warning records | 0 | 0 |
-| Decisions | 1,377 | 1,050 |
-| Verified intended choices / unknown | 1,370 / 7 | 1,050 / 0 |
-| Intended-choice coverage | 99.49% | 100% |
-| Verified voluntary / forced switches | 292 / 153 | 36 / 184 |
-| Verified ordinary moves / engine actions | 839 / 86 | 763 / 67 |
-| Eligible paired opponent targets | 1,026 | 749 |
-| Paired voluntary switch / move targets | 249 / 777 | 33 / 716 |
-| Run wall seconds | 7.047 | 6.507 |
-| Python CPU seconds | 2.109 | 1.469 |
-| Last sampled server CPU seconds | 3.172 | 3.266 |
-| Sampled peak Python RSS, bytes | 90,480,640 | 90,660,864 |
-| Sampled peak server RSS, bytes | 439,517,184 | 437,395,456 |
+| V4 constant frequency | 0.125640 | 0.418091 |
+| V4 conditional counts | 0.118878 | 0.392674 |
+| V4 logistic regression | **0.078675** | **0.246724** |
 
-These are **restricted four-team-pool, weak-baseline results**, not held-out generalization or competitive-strength evidence. Wilson intervals are descriptive Bernoulli intervals for this small schedule; heterogeneous matchups are not an IID sample of human opponents. Resource peaks are sampled at 0.1 seconds, and wall time includes server lifecycle but excludes preflight/setup. Neither cleanup forfeits nor incomplete games contribute wins.
+Paired descriptive 95% intervals from 1,000 **whole-battle** bootstrap resamples:
 
-Artifacts:
+| Logistic minus reference | Brier difference [interval] | Log-loss difference [interval] |
+|---|---|---|
+| Constant | -0.046964 [-0.051960, -0.042271] | -0.171367 [-0.185147, -0.158430] |
+| Conditional | -0.040203 [-0.044777, -0.035766] | -0.145950 [-0.160018, -0.132324] |
 
-- [Random comparison summary](../runs/m2-comparison-random/summary.json), [battle rows](../runs/m2-comparison-random/battles.jsonl), [decisions](../runs/m2-comparison-random/decisions.jsonl), [privileged labels](../runs/m2-comparison-random/privileged/labels.jsonl).
-- [MaxBasePower comparison summary](../runs/m2-comparison-max-base-power/summary.json), [battle rows](../runs/m2-comparison-max-base-power/battles.jsonl), [decisions](../runs/m2-comparison-max-base-power/decisions.jsonl), [privileged labels](../runs/m2-comparison-max-base-power/privileged/labels.jsonl).
-- [Final audit and SHA-256 inventory](../runs/m2-acceptance.json) covers every comparison artifact, observed engine-side balance and current source hashes. The run directories occupy about 22.96 MB and 15.79 MB, including separate journals and engine evidence.
+Negative differences favor logistic. Intervals retain correlated turns and
+describe this fixed schedule, not held-out teams, unseen opponent rules or humans.
 
-Both complete saved-log audits passed: 1,377 and 1,050 snapshot/choice/label records, plus 24 terminal rows each. Original run manifests remain unchanged. After the comparisons, only reporting and launcher utilities changed: `reporting.py` added warning/interval/schedule reporting; `environment.py` and `cli.py` corrected the separate-server log location. The policy, adapter, schema, runner, label logic, team and config hashes still match both comparison manifests. Final integration tests cover the launcher correction. Documentation changes are outside the source manifest.
+| Target group | Examples / switches | Constant Brier | Counts Brier | Logistic Brier |
+|---|---:|---:|---:|---:|
+| V2 | 2,191 / 211 | 0.089768 | 0.082622 | 0.073590 |
+| Moderate | 2,453 / 346 | 0.121214 | 0.115375 | 0.075965 |
+| Active | 2,733 / 530 | 0.158369 | 0.151088 | 0.085184 |
 
-## Ambiguity, warnings and observed performance
+All three target groups and four observer groups had lower logistic Brier and log
+loss. Full group metrics and calibration for every predictor are retained in the
+JSON report. Logistic calibration is still imperfect:
 
-In random-comparison match index 20, decision `m20:a:r78` at turn 34 offered Hyper Beam with `maybeLocked`; the engine committed `move fight` during Clamp. That mismatch invalidates seven decisions in that side's remaining sequence. They remain unknown with `engine_choice_or_sequence_mismatch`; the recorder does not guess how to resynchronize. Eleven decisions have unknown binary eligibility in total, including uncertain request flags. Coverage is reported over both players' attempts; paired targets are a smaller, explicitly filtered set.
+| Predicted bin | Support | Mean prediction | Observed switch fraction |
+|---|---:|---:|---:|
+| [0, .2) | 5,270 | .0489 | .0309 |
+| [.2, .4) | 1,236 | .2989 | .3010 |
+| [.4, .6) | 587 | .4845 | .5400 |
+| [.6, .8) | 198 | .6751 | .7828 |
+| [.8, 1] | 86 | .8378 | .9302 |
 
-Eight wrapper warning records describe four repeated Clamp announcements seen by both clients. Poke-env 0.16.1 strips the unsupported trailing `[from] Clamp` annotation. The independent public projection and current engine requests still provide the fields used here. Warnings remain in `events.jsonl`; none were suppressed or counted as invalid actions. Broad Gen 1 state-tracking correctness is not claimed.
+The largest-magnitude standardized coefficient is recent public foe switch
+(-1.7422), consistent with these fixed opponents' cooldown. This helps explain
+why prediction is easier in this mixture; it does not show general opponent
+understanding or establish a history-only benefit without an ablation.
 
-The heuristic's advantage is plausible against these weak rules, but the run is not an ablation of its components. Against MaxBasePower, the heuristic selected self-KO moves 5 times versus 35 for MaxBasePower. Its type-aware attack utility and self-KO penalty avoid some obvious baseline behavior; this observation alone does not establish which term caused wins.
+## Battle results and decision influence
 
-The two losses occurred at zero-based match indices 4 and 13. In match 4, the heuristic's team v1-a lost to v2-c in 24 turns; its Alakazam's Psychic left the opposing Tauros at publicly displayed 54/100 before Hyper Beam knocked Alakazam out. In match 13, v2-c lost to v1-b in 22 turns; repeated Fight requests and public freeze prevention constrained late actions, ending with a frozen Chansey. These logs show limits of the fixed utility rules; they do not justify attributing the whole losses to one event or tuning after the comparison.
+All **288/288 final games completed**. Each table cell is wins/losses/draws from
+24 games, with complete team/side balance. No cleanup outcomes became wins.
 
-## Tests and retained earlier attempts
+| Observer policy | vs V2 | vs moderate | vs active | Total W/L/D | Completed win rate [Wilson 95%] |
+|---|---|---|---|---|---|
+| Constant | 11/13/0 | 13/11/0 | 16/8/0 | 40/32/0 | 40/72 = 55.56% [44.09, 66.46] |
+| Conditional | 12/12/0 | 13/10/1 | 18/5/1 | 43/27/2 | 43/72 = 59.72% [48.18, 70.28] |
+| Logistic | 10/14/0 | 11/12/1 | 19/5/0 | 40/31/1 | 40/72 = 55.56% [44.09, 66.46] |
+| V2 reference | 12/10/2 | 12/11/1 | 18/5/1 | 42/26/4 | 42/72 = 58.33% [46.81, 69.01] |
 
-Final checks: **49 offline unit tests passed** and **7 explicitly selected integration tests passed**. Integration includes complete baseline games, expanded-team games, real cap/timeout accounting, engine request probes, the authoritative commitment/unexecuted-move scenario, and separate-server evidence copying. Unit tests exercise hidden-state isolation, frozen/raw-HP preservation, reproducible randomness, mapping/fallbacks, Gen 1 type/recovery/status/switch rules, label pairing, forced/voluntary choices, missing/mismatched commitments, execution evidence and balanced schedules.
+Simulator RNG was not controlled. These restricted-pool results establish **no
+battle benefit**: logistic tied constant wins, had fewer than counts and V2, and
+varied by opponent. Better probability estimates did not reliably improve this
+approximate scoring rule. There was no rerun or retuning.
 
-Latest integration artifacts include `runs/integration-1037044b41`, `runs/integration-truncated-66375a9b6d`, `runs/integration-timeout-ca7dcd1f48`, `runs/integration-m2-11ff7283ca`, and `runs/integration-separate-dce0910d19`. Caps and timeouts in these tests are intentional and contribute zero wins.
+Across 7,772 prediction-policy decisions, logistic's same-snapshot alternative
+differed from constant 128 times and conditional 138 times. On logistic's own
+2,684 decisions, it differed 46 times from constant, 57 from counts and 61 from V2.
+These are choices, not counterfactual wins. A traceable example is
+`runs/v4-acceptance/logistic-vs-gen1-heuristic/decisions.jsonl`, `m0:a:r6`, turn 3:
+constant p=.14864 gives Thunderbolt utility 175.879; logistic p=.49046 lowers it
+to 143.406, below Soft-Boiled's unchanged 148.257, so healing is selected. Both
+choices are legal on the same snapshot. This does not prove healing was best.
 
-Earlier diagnostic attempts remain visible:
+## Label coverage, exclusions and resources
 
-| Artifact | Actual outcome / discovered defect |
-|---|---|
-| `runs/m2-label-probe` | Four games completed, heuristic 2–2, 220 attempts, zero verified labels. Three server logging-directory `CRASH:` reports and a filename lookup error made this fail data acceptance despite completed games. Both defects were fixed. |
-| `runs/m2-label-probe-fixed` | Two games completed, heuristic 2–0, 86 verified commitments; all execution fields were still unknown because JSON lists did not equal in-memory tuples during prefix checks. Serialization normalization was fixed before comparisons. |
-| Earlier `runs/integration-*` | Retained real smoke/limit tests, including a check that initially rejected the newly observed Clamp warning until its source and supported-field impact were investigated. |
+All 9,599 development and 20,620 final attempts matched committed engine inputs
+(**100% commitment coverage** in these runs). Not every attempt is a training
+example. Final records exclude 2,430 forced replacements, 1,379 engine actions and
+1,987 requests without meaningful move/switch choice, leaving 14,824 eligible
+joined examples across both directions. Primary runner-b eligibility is
+7,377/10,357 attempts (71.23%); exclusions are 1,262 forced, 619 engine and 1,099
+no-choice. Unknown commitments/eligibility, mismatches and missing joins were zero
+here; conservative exclusion paths remain tested and unchanged.
 
-These early probes predate the final label schema and are not pooled with comparison results or presented as final audit passes. The original M1 runs remain intact too.
+Across **432 reported games**: zero invalid actions, caps, timeouts, crashes,
+cancellations, not-started games, server crash reports or wrapper warnings.
+Original warning handling remains active. Development took 62.98s, final 139.40s,
+**202.37s combined** including run setup/audits/data reports, below the
+600-game/900-second ceiling. Final checksum/verification and separate CLI commands
+are additional small overhead, not represented as battle time. Training took
+0.303s wall / 0.328s CPU and 80.75 MiB RSS at completion.
 
-## Commands actually executed
+Sampled Python peak RSS was 173.23 MiB; managed server tree peak was 433.68 MiB.
+Runner CPU totals were 48.44s Python and 58.03s server (last samples); these exclude
+offline phases and are not exact lifetime CPU/peak measurements. No listener was
+left on port 8000. Services used 127.0.0.1 and concurrency 1.
 
-From the project root in PowerShell; use new output paths for another run:
+## Tests, exact commands and artifacts
+
+**84 unit tests passed** (0.46s); **9 integration tests passed** (49.94s). Integration
+requested 25 games: 23 completed, one deliberate cap and one deliberate timeout,
+neither counted as a win. Official-engine probe scenarios are tests, not
+evaluation games. Integration data is excluded from reported development/final
+datasets. `pip check` and `git diff --check` passed.
+
+Commands actually run from the project root in PowerShell (experiment console
+logs are retained under `.local/`):
 
 ```powershell
+. .\scripts\env.ps1
 .\.venv\Scripts\python.exe -m pip install --no-deps -e .
 .\.venv\Scripts\python.exe -m pip check
-.\.venv\Scripts\python.exe -m battlemind doctor --start-server --config configs/milestone2.json > runs/m2-doctor.json
+.\.venv\Scripts\python.exe -m battlemind doctor --start-server --config configs/milestone2.json
 .\.venv\Scripts\python.exe -m pytest -q
 .\.venv\Scripts\python.exe -m pytest -q -m integration
-.\.venv\Scripts\python.exe -m pytest -q -m integration -k separate_server
-.\.venv\Scripts\python.exe -m battlemind battle --start-server --config configs/milestone2.json --agent-b random --output runs/m2-comparison-random
-.\.venv\Scripts\python.exe -m battlemind battle --start-server --config configs/milestone2.json --agent-b max-base-power --output runs/m2-comparison-max-base-power
-.\.venv\Scripts\python.exe -m battlemind report --run runs/m2-comparison-random --audit
-.\.venv\Scripts\python.exe -m battlemind report --run runs/m2-comparison-max-base-power --audit
+.\.venv\Scripts\python.exe scripts/experiment-v4.py collect --output runs/v4-development --predictor models/v3-counts.json --budget runs/v4-budget.json
+.\.venv\Scripts\python.exe -m battlemind supervised-train --dataset runs/v4-development/development-data --output models/v4-supervised.json
+.\.venv\Scripts\python.exe -m battlemind supervised-evaluate --dataset runs/v4-development/development-data --predictor models/v4-supervised.json --partition development_check --output runs/v4-validation-quality
+.\.venv\Scripts\python.exe scripts/experiment-v4.py final --output runs/v4-acceptance --predictor models/v4-supervised.json --budget runs/v4-budget.json
+.\.venv\Scripts\python.exe -m battlemind report --run runs/v4-acceptance/logistic-vs-switch-moderate --audit
+.\.venv\Scripts\python.exe -m battlemind supervised-dataset --runs runs/integration-v4-73e081637f/recorded --output datasets/v4-cli-smoke
+.\.venv\Scripts\python.exe .local/verify-v4.py
+git -c core.safecrlf=false diff --check
 ```
 
-A local Python audit also ran `tests.test_integration.audit_run` and `labels.audit_labels` on both comparisons, checked actual p1/p2 balance and matching critical source hashes, and wrote the content inventory at `runs/m2-acceptance.json`. The full integration suite was rerun after the separate-server correction: seven passed in 27.69 seconds. No Git repository exists at the project root; no commit, push or deployment was made.
+Load `env.ps1` in each new shell before server commands; it selects Node 24.19.0
+over the default 24.20.0. Existing output directories are intentionally rejected.
+Do not repeat the final benchmark to pursue a better outcome.
 
-## Remaining limitations and single next milestone
+Actual retained artifacts, relative to this workspace:
 
-Only the pinned Windows runtime, `gen1ou`, concurrency 1 and this restricted pool are verified. Effective stats, counters, trapping duration, hidden moves and other unsupported quantities remain unknown. Heuristic scores are approximations and can make poor choices. Missing end logs or normalization mismatches reduce label coverage; eligibility exclusions introduce selection bias. Public move announcements establish observation, not permanent moveset membership or successful execution. Manual-server identity is not independently attested, custom external log paths are unsupported, and external-server resources are unmeasured. No exact replay determinism or ready-to-train dataset is claimed.
+- `runs/v4-development/`: six runs, freeze, audited dataset and summary;
+  `artifact-hashes.json` verifies **668 files**.
+- `models/v4-supervised.json`: SHA-256
+  `44a403e1771cf15f31987a08d31c7856900f04d3fc2eca2c957a23704f04a252`.
+- `runs/v4-validation-quality/`: selection-partition probability report.
+- `runs/v4-acceptance/`: final freeze, twelve runs, evaluation dataset,
+  `probability-quality/summary.json`, predictions, summary and **1,330** verified
+  artifact hashes. Source/model hashes still match both freezes.
+- `runs/v4-budget.json`: 432 reserved games, both phases finished; no retry.
+- `runs/v4-verification.json`: hash checks, zero split overlap, final-training
+  rejection, preserved V2/team/V3 hashes and listener check.
+- `runs/integration-v4-73e081637f/`: real record → training → inference → audit test;
+  `datasets/v4-cli-smoke/` verifies the dataset CLI on those test records.
+- `.local/v4-collection-console.log`, `.local/v4-final-console.log`,
+  `.local/v4-validation-console.json`, `.local/v4-final-cli-audit.json` retain CLI
+  output. Generated datasets/models/runs and `.local/` remain ignored.
 
-**Next: Milestone 3 — a small opponent predictor.** Build a leakage-safe dataset from verified observer-to-label joins, split by whole battle, and compare frequency counts with a small switch-versus-move classifier using class balance, Brier score/log loss and held-out evaluation. Keep connecting predictions to action scores for Milestone 4.
+Original V3 model SHA-256 remains
+`e46feb7dc665c046c03f4b7cb6e4072b0dafbd56c3b04625cae68537722222ef`.
+V3's runs/model and unrelated uncommitted implementation were preserved. No commit,
+push or deployment was made.
+
+## Explanation and limits
+
+One request becomes a frozen player-visible snapshot. The feature function reads
+only that snapshot; the frozen logistic dot product produces a switch probability.
+The shared policy weights existing stay/switch utilities, selects a legal ID,
+and the adapter maps it to the current request command. Only after the match does
+the separate recorder establish committed labels for future offline training.
+The snapshot and mapping predate the label; no current opponent choice or private
+team enters inference. [PREDICTION.md](PREDICTION.md) explains the important code
+and separates original engineering work from standard statistical algorithms.
+
+This is supervised learning from validated **local recorded battles**, not arbitrary
+Showdown replay support. Data contains four teams and three related fixed rules.
+History and classifier capacity were added together, so their effects are not
+isolated. Live meaningful-choice eligibility remains unknown; its conditional
+probability is applied under the existing approximation. Damage, switch
+destinations and Gen 1 effective stats remain approximate or unknown as documented.
+Calibration is imperfect; battle utility may not reward better predictions
+appropriately. No competitive-strength or individual-adaptation claim.
+
+The single recommended next milestone is **V5 — bounded self-play learning,
+informed by V4's findings**. It needs a defined policy update and separate frozen
+checkpoint evaluation; V4's probability gain alone does not justify scaling up.

@@ -1,5 +1,19 @@
 # Verified compatibility
 
+V4 intentionally adds no runtime download: NumPy 2.5.2 was already locked and is
+now declared directly in the optional `train` extra. Python 3.14.3, Node 24.19.0,
+poke-env 0.16.1 and the official engine pin are unchanged. Logistic inference uses
+Python math; training uses NumPy float64 linear algebra. Before V4 runner parameter
+plumbing, the installed `player.py` message/request methods (approximately lines
+295–420) were read again. Their chronological parsing, sending, error handling and
+the existing BattleMind hook implementations were not changed. V4 regression tests
+exercise a batched future message with the logistic policy and real local
+record/training/inference/audit behavior.
+
+V3 rechecked the pinned installation on 2026-09-08. The system PATH now also contains Node 24.20.0; source `scripts/env.ps1` to select the existing pinned 24.19.0 runtime. An initial integration invocation correctly failed its version guard (seven cases failed preflight, one engine probe passed); the pinned invocation subsequently passed all eight cases. No version pin was loosened and no dependency was added.
+
+Before adding prediction logging, installed `poke_env/player/player.py` request/message dispatch and `choose_move` handling were inspected again. V3 extends BattleMind's own `choose_move` hook to call the snapshot-only policy evaluation once and journal it before submission. Chronological request processing, error handling, post-match label hooks, installed wrapper code and engine source remain unchanged. The batched-future-message regression now also runs with the conditional policy.
+
 Checked on 2026-09-05 against current official documentation and the actual installed source. The environment is Windows 11 Home x64, Intel i7-11700KF (8 cores / 16 logical processors), about 39.9 GiB visible RAM. The system Python was available on PATH. Git, Node, and pnpm were discovered in the local bundled runtime; no GPU was used.
 
 | Component | Selected version |

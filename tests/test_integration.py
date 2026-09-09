@@ -146,3 +146,68 @@ def test_separate_server_copies_matching_commit_evidence():
     assert (output / "privileged/000-engine.json").is_file()
     assert result["resources"]["managed_server_peak_sampled_rss_bytes"] is None
     assert audit_labels(output)["ok"]
+
+
+def test_v3_audited_dataset_frozen_counts_and_real_policy_pipeline():
+    from battlemind.dataset import build_dataset, fit_predictor
+    from battlemind.environment import sha256
+    from battlemind.prediction_report import audit_predictions, evaluate_predictor
+
+    root = ROOT / "runs" / ("integration-v3-" + uuid.uuid4().hex[:10])
+    base = root / "development-battles"
+    config = replace(RunConfig(), battles=4, port=free_port())
+    assert asyncio.run(run(config, base, start_server=True))["completed"] == 4
+    dataset = root / "development-data"
+    build_dataset([base], dataset)
+    with pytest.raises(ValueError, match="Duplicate run identity"):
+        build_dataset([base, base], root / "duplicate-data")
+    model = root / "counts.json"
+    fit_predictor(dataset, model)
+    original_hash = sha256(model)
+    evaluation = root / "evaluation-battles"
+    config = replace(config, agent_a="switch-constant", agent_b="switch-context", predictor=str(model), port=free_port())
+    result = asyncio.run(run(config, evaluation, start_server=True))
+    assert result["completed"] == 4, result
+    audit_run(evaluation, 4)
+    assert audit_predictions(evaluation)["prediction_decisions"] == result["decisions"]
+    fresh = root / "evaluation-data"
+    build_dataset([evaluation], fresh, role="evaluation")
+    quality = evaluate_predictor(fresh, model, root / "probability-report", "evaluation")
+    assert quality["balance"]["examples"] > 0
+    assert 0 <= quality["metrics"]["conditional"]["brier"] <= 1
+    assert sha256(model) == original_hash == sha256(evaluation / "predictor.json")
+
+
+def test_v4_real_record_training_frozen_inference_and_audit():
+    from battlemind.supervised_data import build_supervised_dataset, load_bundle
+    from battlemind.supervised_training import train_bundle
+    from battlemind.supervised_report import evaluate_bundle
+    from battlemind.prediction_report import audit_predictions
+    from battlemind.environment import sha256
+
+    root = ROOT / "runs" / ("integration-v4-" + uuid.uuid4().hex[:10])
+    config = replace(RunConfig(), agent_a="switch-moderate", agent_b="random", battles=4, port=free_port())
+    recorded = root / "recorded"
+    result = asyncio.run(run(config, recorded, start_server=True))
+    assert result["completed"] == 4, result
+    audit_run(recorded, 4)
+    data = root / "development-data"
+    manifest = build_supervised_dataset([recorded], data)
+    assert manifest["primary_balance"]["development_fit"]["switches"] > 0
+    model = root / "model.json"
+    train_bundle(data, model)
+    frozen = sha256(model)
+    _, bundle = load_bundle(model)
+    assert bundle.logistic.regularization in {0.01, 0.1, 1.0}
+    evaluation = root / "evaluation"
+    config = replace(config, agent_a="switch-logistic", agent_b="switch-context", predictor=str(model), port=free_port())
+    result = asyncio.run(run(config, evaluation, start_server=True))
+    assert result["completed"] == 4, result
+    audit_run(evaluation, 4)
+    assert audit_predictions(evaluation)["prediction_decisions"] == result["decisions"]
+    fresh = root / "evaluation-data"
+    build_supervised_dataset([evaluation], fresh, role="evaluation")
+    quality = evaluate_bundle(fresh, model, root / "quality", "evaluation")
+    assert quality["balance"]["examples"] > 0
+    assert all(0 <= m["brier"] <= 1 for m in quality["metrics"].values())
+    assert sha256(model) == frozen == sha256(evaluation / "predictor.json")

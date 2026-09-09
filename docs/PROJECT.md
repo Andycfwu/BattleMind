@@ -20,11 +20,11 @@ These are hypotheses. Negative findings are useful. Neither competitive strength
 | Local battle environment | Official local Showdown; owns rules, legal requests, resolution, results, and validation |
 | Observation/action adapter | Frozen, typed, versioned player-visible snapshots; stable semantic IDs mapped to current legal commands |
 | Our battle policy | Chooses our action from sanitized observations: RandomLegalAgent, MaxBasePowerAgent and the documented Gen1HeuristicAgent |
-| Opponent predictor | Later: probabilities and uncertainty over the opponent's voluntary switch versus move decision; separate from our policy |
-| Data/training | Present: separate post-commit intended-choice recorder and audits. Later: leakage-safe battle datasets, small models, versioned checkpoints and training configurations |
+| Opponent predictor | V3/V4: frozen constant frequency, conditional counts and supervised logistic regression; numeric switch probabilities, separate from shared action scoring |
+| Data/training | Audited local observer-to-label datasets, whole-battle partitions, train-only preprocessing and logistic fitting, validation selection, frozen JSON bundles |
 | Evaluation/reporting | Fixed match schedules, explicit failures, reproducible metadata, JSONL and JSON/CSV; independent of training |
 
-Current flow: local Showdown → player's request and public history → immutable observation/legal choices → policy ID → checked command → Showdown. Completed games are logged. Later, a separate dataset/training pipeline will produce a frozen predictor or policy for a separate evaluation run. Public history can feed prediction; privileged recording data cannot feed features.
+Current flow: local Showdown → player's request and public history → immutable observation/legal choices → frozen switch predictor → shared utility scoring → policy ID → checked command → Showdown. Completed games feed a separate audited dataset and supervised training/count-estimation step; evaluation never updates fitted parameters. Privileged recording data establishes targets and evaluation eligibility only and cannot feed policy features.
 
 ## Information boundaries
 
@@ -36,26 +36,27 @@ The Milestone 2 recorder combines both players' attempts only after the clients 
 
 ## Staged roadmap
 
-| Milestone | Scope and evidence required |
+| Version | Scope and evidence required |
 |---|---|
-| 1. Local foundation | Real matches by both simple baselines; legal mappings, honest unknowns, immutable snapshots, bounded runs, logs, tests, diagnostics, summaries. A 20-match smoke run validates plumbing only. |
-| 2. Better baselines and trustworthy data | Stronger documented Gen 1 heuristic, more varied versioned teams/opponents, and validated intended-choice labels with voluntary/forced/ambiguous handling. No claim of prediction yet. |
-| 3. Small opponent predictor | Counts first, then a small classifier such as logistic regression for voluntary switch versus choosing a move when the opponent genuinely has options. Train/validate/test by whole battle; compare probability quality with simple frequency baselines. |
-| 4. Prediction changes decisions | Connect predicted probabilities to an explicit shared scoring system. Run matched prediction-off/state-only/history comparisons and report win-rate effects, including negative findings. |
-| 5. Optional stronger learning | Investigate imitation learning, then carefully budgeted self-play against diverse frozen opponents. An actual update step and held-out evaluation are required to call it learning. |
-| 6. Demonstration and explanation | A lightweight local replay/report viewer, architecture explanation, reproducible experiments, and clear original/reused-work attribution. Human challenges and individual-opponent adaptation are optional extensions. |
+| V1. Legal matches — implemented | Legal mappings, honest unknowns, immutable snapshots, bounded local games, logs, tests and diagnostics. Historical Milestone 1. |
+| V2. Basic strategy — implemented | Documented Gen 1 heuristic, varied legal teams, audited intended choices and voluntary/forced/ambiguous handling. Historical Milestone 2. |
+| V3. Opponent prediction — implemented | Frozen constant and conditional-count switch prediction, audited battle-level dataset, probability evaluation, and prediction-weighted decisions. Compare the same scoring policy with constant versus conditional probabilities; retain V2 as a separate reference. No trained classifier or evaluation-time learning. |
+| V4. Supervised training from local records — implemented | Logistic regression from audited local recorded battles, train-only preprocessing, whole-battle validation, fair count baselines, safe frozen inference, and separate probability/decision/battle evaluation. No arbitrary replay-file ingestion. |
+| V5. Bounded self-play learning — next, requires a new request | Define an actual policy/reward update and frozen-checkpoint evaluation, informed by V4's findings. Generating games alone is not learning. |
+| V6. Individual-opponent adaptation — later | Test whether remembering an individual's earlier visible behavior improves over a non-adaptive version without hidden-state or account-identity shortcuts. No adaptation claim before evidence. |
+| V7. Consolidated benchmarks — later | Consolidate reproducible comparisons, ablations, failures, resource budgets and uncertainty across versions; evaluate suitable held-out teams/opponents for any generalization claim. |
 
-Milestones 1 and 2 are implemented; `STATUS.md` records their acceptance evidence and limitations. No predictor, training, checkpoint, frontend, or dashboard scaffolds have been added. Every milestone should be independently useful; completing all six is not a prerequisite for a useful project.
+This version roadmap follows the owner's requests and replaces the earlier six-milestone ordering. Prediction affects decisions in V3; supervised training from local recorded battles begins in V4. **Benchmark every version as it is developed**; V7 consolidates evidence rather than postponing evaluation. `STATUS.md` records acceptance evidence and historical milestone documents preserve earlier findings. V5–V7, external replay ingestion, a frontend and a replay viewer are not implemented. Each version should be independently useful.
 
-## Later prediction experiment
+## Prediction experiment and later extensions
 
 Use the same candidate-action scoring system across three variants:
 
-- A: fixed/simple opponent-behavior estimate.
-- B: learned prediction from the current visible state.
-- C: prediction also using past visible opponent actions.
+- A: fixed frequency estimated on development games (implemented V3).
+- B: conditional counts using the current visible state (implemented V3).
+- C: logistic regression using compact visible state plus recent public switch/drag indicators (implemented V4). V4 does not isolate the benefit of history from model capacity; a history ablation or individual adaptation requires a separate experiment.
 
-One possible transparent approximation scores consequences of the opponent staying versus voluntarily switching, weighted by predicted probabilities. Define exactly how this changes scores. For unknown switch destinations, use documented assumptions instead of the true hidden team. Start lightweight: do not introduce an alternate full simulator or expensive search just to complete the design. Return actual probabilities/uncertainty, not natural-language “thoughts.”
+V3 weights damaging-move utility against the current foe and a uniform mixture of publicly revealed living bench Pokémon plus anonymous neutral-type alternatives for unseen slots. Other V2 scores remain unchanged. The conditional probability is defined given a meaningful opponent choice; actual eligibility is often unknown during play, so applying it online is an explicit approximation. See `PREDICTION.md`. There is no alternate simulator or search, and no fabricated natural-language thoughts.
 
 Switch/move labels must reflect genuine choices. Later targets might distinguish move categories, destinations, or hidden moves, but may not use the opponent's private legal-action list as prediction input. Opponent-specific adaptation is a stretch goal that needs measured benefit over a non-adaptive comparison before being advertised.
 

@@ -1,8 +1,44 @@
 # BattleMind
 
-A local Pokémon Showdown player and experiment harness. **Milestones 1 and 2:** three transparent baselines, four legal teams, immutable observations, bounded battles, and intended-choice labels checked against the official engine's committed inputs. No predictor, training, frontend, hosted service, API key, or GPU is involved.
+A local Pokémon Showdown player and experiment harness. **V1–V4:** legal battles, transparent Gen 1 policies, audited opponent-choice data, and frozen count/logistic switch prediction that influences shared action scoring. V4 trains logistic regression from validated local recorded battles on CPU. External replay ingestion, self-play learning, frontend, hosted services, API keys and GPUs are not required or implemented.
 
-The research question for later milestones is whether a learned opponent predictor improves the **same** decision-making system. This repository currently proves that the local pipeline works. It does not establish competitive strength.
+The central experiment is whether opponent prediction improves the **same** decision-making system. V4 compares a trained classifier with constant and conditional frequencies fitted on the same training rows. Probability quality and battle wins are separate outcomes. See [actual results](docs/STATUS.md) and the preserved [negative V3 findings](docs/MILESTONE3.md).
+
+## V4 supervised workflow
+
+[The experiment specification](docs/V4-EXPERIMENT.md) freezes opponents, teams, splits,
+features, metrics and a 432-game schedule before collection. These commands use
+fresh output names; do not rerun a final comparison to obtain a better result.
+
+```powershell
+. .\scripts\env.ps1
+.\.venv\Scripts\python.exe scripts/experiment-v4.py collect --output runs/v4-development --predictor models/v3-counts.json --budget runs/v4-budget.json
+.\.venv\Scripts\python.exe -m battlemind supervised-train --dataset runs/v4-development/development-data --output models/v4-supervised.json
+.\.venv\Scripts\python.exe -m battlemind supervised-evaluate --dataset runs/v4-development/development-data --predictor models/v4-supervised.json --partition development_check --output runs/v4-validation-quality
+.\.venv\Scripts\python.exe scripts/experiment-v4.py final --output runs/v4-acceptance --predictor models/v4-supervised.json --budget runs/v4-budget.json
+.\.venv\Scripts\python.exe -m battlemind report --run runs/v4-acceptance/logistic-vs-switch-moderate --audit
+```
+
+The driver builds datasets automatically. For other **validated local runs** use
+`python -m battlemind supervised-dataset --runs RUN1 RUN2 --output FRESH_DIRECTORY`
+(add `--role evaluation` for fresh final data). It does not accept arbitrary
+Showdown replay files. Complete battles stay together across both perspectives.
+Only runner-b eligible opponent labels enter the primary training/evaluation
+population. Numeric preprocessing and model coefficients use training rows only;
+three declared regularization strengths are selected on validation log loss.
+
+`models/v4-supervised.json` is safe JSON with frozen coefficients, preprocessing,
+fair count baselines and provenance. NumPy 2.5.2 was already in `requirements.lock`;
+the `train` extra now declares its direct use without adding a download. The
+collection driver requires this workspace's retained original V3 artifact; models
+and recorded runs are ignored, so a source-only clone must retain/recover those
+artifacts to reproduce this exact specification. Independent new experiments can
+use the generic battle/dataset/training commands with their own declared setup.
+
+`switch-logistic`, `switch-constant` and `switch-context` share unchanged candidate
+scoring. `switch-moderate` and `switch-active` are fixed data-collection opponents
+with switch thresholds 40 and 0; V2's threshold 80 remains unchanged. See
+[PREDICTION.md](docs/PREDICTION.md) for the model and interview explanation.
 
 ## Setup (verified on Windows / PowerShell)
 
@@ -18,6 +54,8 @@ python -m venv .venv
 ```
 
 On a machine without the bundled tools, install the pinned versions and put `node`, `git`, and `pnpm` on PATH first. If npm is already available, `npm install --global pnpm@11.19.0` provides the pinned package manager. That alternative bootstrap has not been tested here. Only Windows has been verified; the Python runner contains portable process handling, but no cross-platform claim has been tested.
+
+Run `. .\scripts\env.ps1` in **each new PowerShell terminal** before server commands. The system now also has Node 24.20.0; the project correctly rejects it until the pinned 24.19.0 bundle is selected. V3 adds no dependencies; `requirements.lock` remains unchanged.
 
 The setup script uses a shallow official-engine checkout under ignored `.local/`, installs production dependencies from the saved pnpm lock, and installs esbuild's small platform executable. Optional native database packages and dev tools are omitted. Its esbuild installer may print an npm fallback warning when npm is absent; the upstream direct-registry fallback successfully installed the binary here. It refuses to overwrite a differing existing server configuration or change a different checkout. Third-party license files remain in the checkout and installed distributions.
 
@@ -41,6 +79,29 @@ Milestone 2 comparison: each 24-game run covers every pair of the four teams wit
 ```
 
 An output directory must be new; runs never overwrite earlier logs. Omit `--output` to create a timestamped directory. With the venv activated, the shorter `python -m battlemind ...` commands work as well.
+
+## V3 count prediction and comparison
+
+These commands build an audited dataset from the two retained M2 runs, split whole battles into count-estimation and development-check partitions, and save immutable smoothed frequencies. Previously reported M2 games remain development evidence. Use fresh output names if the example files already exist.
+
+```powershell
+. .\scripts\env.ps1
+.\.venv\Scripts\python.exe -m battlemind dataset --runs runs/m2-comparison-random runs/m2-comparison-max-base-power --output datasets/my-v3-development --seed 2026
+.\.venv\Scripts\python.exe -m battlemind predictor-fit --dataset datasets/my-v3-development --output models/my-v3-counts.json
+.\.venv\Scripts\python.exe -m battlemind predictor-evaluate --dataset datasets/my-v3-development --predictor models/my-v3-counts.json --partition development_check --output runs/my-v3-development-quality
+.\.venv\Scripts\python.exe scripts/benchmark-v3.py --predictor models/my-v3-counts.json --output runs/my-v3-acceptance
+```
+
+The fixed benchmark runs constant, conditional and unchanged V2 policies against random and MaxBasePower: **six 24-game cells, 144 games total**, one battle at a time and a 600-second overall budget. It writes a pre-run freeze manifest, copies the predictor into every run, audits decisions, builds a fresh evaluation dataset, compares Brier score/log loss/calibration, and saves content hashes. No counts or rules are updated during evaluation. A new clone without ignored M2 artifacts first needs bounded local development runs; do not fabricate fixture data as performance evidence.
+
+For one smaller run:
+
+```powershell
+.\.venv\Scripts\python.exe -m battlemind battle --start-server --config configs/v3-battle.json --predictor models/my-v3-counts.json --agent-a switch-context --agent-b max-base-power --battles 4 --output runs/my-v3-probe
+.\.venv\Scripts\python.exe -m battlemind report --run runs/my-v3-probe --audit
+```
+
+Four games cover one team pair, not the complete four-team pool. `switch-constant` uses the same policy with the overall frequency. [PREDICTION.md](docs/PREDICTION.md) explains features, smoothing, uncertainty, scoring, evaluation and the important code paths.
 
 For an explicitly managed server in another terminal:
 
@@ -66,6 +127,7 @@ Only concurrency **1** and `gen1ou` are supported. Unsupported values fail expli
 - **RandomLegalAgent:** samples uniformly from actual request-backed legal actions using its own seeded `random.Random`.
 - **MaxBasePowerAgent:** selects the ordinary legal move with the highest Gen 1 listed base power. Ties use request order, even when all powers are zero. Fixed-damage moves use their listed value (e.g. Seismic Toss is 1), not calculated damage. When no ordinary move is offered, it uses the first engine action if available, otherwise the first legal original team slot. It ignores accuracy, STAB, matchups, survival, and strategy; it often chooses Explosion or Self-Destruct.
 - **Gen1HeuristicAgent** (`gen1-heuristic`): scores power, nominal accuracy, STAB and type matchup, with explicit healing, status, setup, recharge, and self-KO rules. It switches only for a substantial improvement in visible matchup/health utility, with a two-turn cooldown; forced replacements use the best bench utility. Scores are arbitrary utility, not damage or win probability. All weights, ties and limitations are explained in [docs/HEURISTIC.md](docs/HEURISTIC.md), and each candidate score is logged.
+- **SwitchAwareAgent** (`switch-constant` / `switch-context`): weights each damaging move's V2 utility against the current foe and possible switch destinations by a frozen switch probability. Both names use exactly the same scoring code. Revealed living bench Pokémon and anonymous unseen alternatives get equal destination weight; anonymous alternatives have neutral type utility. Status, healing and our switching rules retain V2 scores. This is an approximation, not a second simulator.
 
 The schedule traverses unordered team pairs in four-game blocks: both assignments on both challenger sides. Four teams require 24 games for a complete block; two teams require 4. Shorter runs can be unbalanced. Policy seeds are independently derived from the root seed, match index, and agent label. **The server RNG is not seeded by this interface.** A repeated policy seed does not guarantee the same battles or results.
 
@@ -84,6 +146,6 @@ See [docs/STATUS.md](docs/STATUS.md) for actual acceptance results and known lim
 
 `LocalPlayer` receives a request through `poke-env`. `adapter.snapshot()` copies own request data and the public history into frozen dataclasses. It pairs semantic choices such as `move:psychic` and `switch:2` with commands for that request. The policy sees only the immutable snapshot and returns one ID. `resolve_action()` checks it against that snapshot's legal set and request number. A separate journal for that player records the snapshot hash, mapping, intended choice and scores before submission. Later messages reveal the outcome. Neither policy gets the other's submitted choice.
 
-After both clients stop, the recorder reads both journals and the official end log. Engine `inputLog` entries prove which choices were committed after all required sides chose. Exact sequence matches get intended-choice labels; a mismatch makes the remaining sequence unknown. Public announcements provide separate execution evidence. A verified opponent label points to the **other player's pre-decision snapshot**, not the choosing opponent's private observation. No dataset or training pipeline exists yet. `report --audit` rebuilds labels and checks hashes, request/choice mappings, submissions and per-battle label counts.
+After both clients stop, the recorder reads both journals and the official end log. Engine `inputLog` entries prove which choices were committed after all required sides chose. Exact sequence matches get intended-choice labels; a mismatch makes the remaining sequence unknown. Public announcements provide separate execution evidence. A verified opponent label points to the **other player's pre-decision snapshot**, not the choosing opponent's private observation. V3's offline dataset builder uses that join; only visible context categories enter count estimation. `report --audit` rebuilds labels and, for V3, recomputes predictions, candidate scores and chosen actions from the frozen run artifact.
 
 The engine and networking library are reused infrastructure. BattleMind's main contributions here are its information boundary, understandable utility policy, request mapping, post-commit evidence alignment, bounded orchestration, audits, and tests. See [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md).

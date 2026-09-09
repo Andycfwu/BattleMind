@@ -22,7 +22,9 @@ import psutil
 from .adapter import PublicTracker, resolve_action, snapshot
 from .environment import ROOT, LocalServer, healthcheck, inspect_server, source_manifest, sha256
 from .labels import build_labels, engine_record, label_summary, read_jsonl, snapshot_hash
-from .policies import make_policy
+from .policies import POLICY_NAMES, make_policy
+from .prediction import CountTable
+from .supervised import PredictorBundle
 from .reporting import JsonlWriter, report
 
 
@@ -40,6 +42,7 @@ class RunConfig:
     port: int = 8000
     showdown: str = ".local/pokemon-showdown"
     teams: tuple[str, ...] = ("configs/teams/ou-v1-a.txt", "configs/teams/ou-v1-b.txt")
+    predictor: str | None = None
 
     def validate(self) -> None:
         if self.format != "gen1ou":
@@ -53,7 +56,10 @@ class RunConfig:
         if not 1024 <= self.port <= 65535 or not self.teams:
             raise ValueError("Use a port in 1024..65535 and at least one team")
         for agent in (self.agent_a, self.agent_b):
-            make_policy(agent, self.seed)
+            if agent not in POLICY_NAMES:
+                raise ValueError(f"Unknown policy: {agent}")
+            if agent in {"switch-constant", "switch-context", "switch-logistic"} and not self.predictor:
+                raise ValueError("Switch-aware policies require --predictor")
 
 
 def policy_seed(seed: int, match: int, side: str) -> int:
@@ -103,8 +109,8 @@ class ErrorRecorder(logging.Handler):
 
 class LocalPlayer(Player):
     def __init__(self, *, policy_name: str, seed: int, side: str, state: MatchState,
-                 journal: JsonlWriter | None = None, **kwargs):
-        self.policy = make_policy(policy_name, seed)
+                 journal: JsonlWriter | None = None, counts: CountTable | PredictorBundle | None = None, **kwargs):
+        self.policy = make_policy(policy_name, seed, counts)
         self.side, self.state = side, state
         self.journal = journal or state.decisions_log
         self.trackers: dict[str, PublicTracker] = {}
@@ -163,15 +169,17 @@ class LocalPlayer(Player):
 
     def choose_move(self, battle: Battle) -> SingleBattleOrder:
         observation, mapping = snapshot(battle, self.trackers[battle.battle_tag])
-        chosen = self.policy.choose(observation)
+        evaluation = self.policy.evaluate(observation) if hasattr(self.policy, "evaluate") else None
+        chosen = evaluation.chosen_action if evaluation else self.policy.choose(observation)
         command = resolve_action(chosen, observation, mapping)
         data = asdict(observation)
-        scores = self.policy.scores(observation) if hasattr(self.policy, "scores") else ()
-        self.journal.write({"schema_version": "2.0", "match": self.state.index,
+        scores = evaluation.scores if evaluation else self.policy.scores(observation) if hasattr(self.policy, "scores") else ()
+        self.journal.write({"schema_version": "3.0" if evaluation else "2.0", "match": self.state.index,
             "decision_id": f"m{self.state.index}:{self.side}:r{observation.request_id}",
             "snapshot_sha256": snapshot_hash(data),
             "player": self.side, "observation": data, "legal_mapping": mapping,
             "chosen_action": chosen, "command": command, "action_scores": [asdict(s) for s in scores],
+            **({"prediction_evaluation": asdict(evaluation)} if evaluation else {}),
             "action_semantics": "local intention; commitment and execution require separate evidence"})
         self.state.decisions += 1
         return SingleBattleOrder(command)
@@ -203,7 +211,8 @@ async def close_players(players: list[LocalPlayer]) -> None:
 
 
 async def play_match(config: RunConfig, index: int, decisions: JsonlWriter, events: JsonlWriter,
-                     deadline: float, output: Path, engine_logs: Path, labels_log: JsonlWriter) -> dict:
+                     deadline: float, output: Path, engine_logs: Path, labels_log: JsonlWriter,
+                     counts: CountTable | PredictorBundle | None = None) -> dict:
     state = MatchState(index, config.turn_cap, decisions, events)
     start = time.monotonic()
     assignments, challenger = scheduled_match(index, len(config.teams))
@@ -215,7 +224,7 @@ async def play_match(config: RunConfig, index: int, decisions: JsonlWriter, even
     try:
         for side, name in (("a", config.agent_a), ("b", config.agent_b)):
             player = LocalPlayer(policy_name=name, seed=seeds[side], side=side, state=state,
-                journal=journals[side],
+                journal=journals[side], counts=counts,
                 account_configuration=AccountConfiguration("bm" + uuid.uuid4().hex[:16], None),
                 server_configuration=ServerConfiguration(f"ws://127.0.0.1:{config.port}/showdown/websocket", "http://127.0.0.1:1/action.php?"),
                 battle_format=config.format, max_concurrent_battles=1, open_timeout=5,
@@ -291,10 +300,20 @@ async def run(config: RunConfig, output: Path, start_server: bool = False) -> di
     output = output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     (output / "privileged/attempts").mkdir(parents=True)
+    counts, predictor_meta = None, None
+    if config.predictor:
+        from .dataset import load_predictor
+        # Freeze once; policies get fitted parameters/digest, never offline provenance IDs.
+        source = ROOT / config.predictor
+        (output / "predictor.json").write_bytes(source.read_bytes())
+        _, counts = load_predictor(output / "predictor.json")
+        predictor_meta = {"source_path": str(source.resolve()), "sha256": sha256(output / "predictor.json"),
+                          "evaluation_updates": False}
     metadata = {"schema_version": "2.0", "created_utc": datetime.now(timezone.utc).isoformat(),
                 "config": asdict(config), "environment": diagnostics, "code_sha256": source_manifest(),
-                "policies": {"a": {"name": config.agent_a, "version": make_policy(config.agent_a, config.seed).version},
-                             "b": {"name": config.agent_b, "version": make_policy(config.agent_b, config.seed).version}},
+                "predictor": predictor_meta,
+                "policies": {"a": {"name": config.agent_a, "version": make_policy(config.agent_a, config.seed, counts).version},
+                             "b": {"name": config.agent_b, "version": make_policy(config.agent_b, config.seed, counts).version}},
                 "host": {"os": platform.platform(), "logical_cpus": psutil.cpu_count(),
                          "ram_bytes": psutil.virtual_memory().total},
                 "randomness": {"policy": "SHA256(root seed:match index:a/b), independent random.Random",
@@ -339,7 +358,7 @@ async def run(config: RunConfig, output: Path, start_server: bool = False) -> di
                     abort_reason = "Run deadline reached"
                     break
                 log_root = output / "privileged/engine" if start_server else ROOT / config.showdown / "logs"
-                row = await play_match(config, index, decisions, events, deadline, output, log_root, labels_log)
+                row = await play_match(config, index, decisions, events, deadline, output, log_root, labels_log, counts)
                 battles.write(row)
                 recorded += 1
                 print(f"Match {index + 1}/{config.battles}: {row['status']} winner={row['winner']} turns={row['turns']}", flush=True)

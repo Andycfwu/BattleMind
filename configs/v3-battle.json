@@ -1,0 +1,15 @@
+{
+  "format": "gen1ou",
+  "agent_a": "switch-context",
+  "agent_b": "max-base-power",
+  "predictor": "models/v3-counts.json",
+  "battles": 24,
+  "seed": 20260908,
+  "concurrency": 1,
+  "turn_cap": 300,
+  "timeout": 60,
+  "run_timeout": 600,
+  "port": 8000,
+  "showdown": ".local/pokemon-showdown",
+  "teams": ["configs/teams/ou-v1-a.txt", "configs/teams/ou-v1-b.txt", "configs/teams/ou-v2-c.txt", "configs/teams/ou-v2-d.txt"]
+}
