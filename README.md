@@ -1,6 +1,70 @@
 # BattleMind
 
-A local Pokémon Showdown player and experiment harness. **V1–V6:** legal battles, transparent Gen 1 policies, audited opponent-choice data, frozen prediction, bounded policy learning, and cross-encounter adjustment from an individual synthetic opponent's prior public behavior. Everything runs locally on CPU. External replay ingestion, human profiling, frontend, hosted services, API keys and GPUs are not required or implemented.
+A local Pokémon Showdown player and experiment harness, now with a **V7 local animated viewer and retained-evidence catalog**. Runs on CPU, with no account, API key or paid service. The official engine owns the rules. BattleMind owns the observation boundary, policies, conservative recording, experiments and local demonstration shell.
+
+## Watch a battle
+
+This retained workspace already has the verified demonstration bundle:
+
+```powershell
+.\scripts\start-demo.ps1 -Bundle runs/v7-release-bundle -Output runs/MY_FRESH_DEMO
+# Open http://127.0.0.1:8765
+# Stop from another terminal, or use Ctrl+C in the first:
+.\scripts\stop-demo.ps1 -Run runs/MY_FRESH_DEMO
+```
+
+The launch script loads `scripts/env.ps1`. Select a recording, then use Play/Pause,
+speed, previous/next turn, reset or go-to-turn. Available examples include a normal
+battle, a V5 scored-choice change, the freeze-related cap and four ordered V6
+memory encounters. Chosen available frozen agents can play two bounded live demo
+games by default. Simulation runs faster than animation and is labeled **delayed
+playback**. Controls never enter policy observations. All runtime assets and both
+services stay on 127.0.0.1. No remote sprites, login, telemetry or replay upload.
+
+V6 adaptation is demonstrated through audited chronological recordings, **not live
+cross-encounter adaptation**. The cold start/reset and prior-encounter cutoffs are
+visible. These selected examples are explanations, not a benchmark sample.
+
+For a fresh checkout, install the pinned environment below, retain
+`runs/v7-release-bundle.zip`, and import it without fitting or training:
+
+```powershell
+.\.venv\Scripts\python.exe -m battlemind bundle-import --source PATH_TO_RETAINED_ZIP --output runs/MY_IMPORTED_BUNDLE
+.\.venv\Scripts\python.exe -m battlemind bundle-verify --bundle runs/MY_IMPORTED_BUNDLE
+.\scripts\start-demo.ps1 -Bundle runs/MY_IMPORTED_BUNDLE -Output runs/MY_FRESH_DEMO -Games 0
+```
+
+Recorded playback needs no running engine; live games additionally require the
+pinned Showdown setup below. A source-only clone lacks ignored historical models,
+checkpoints, datasets, records and renderer assets. It can run the transparent
+baselines after setup, but cannot reconstruct historical artifacts from code alone.
+[ARTIFACTS.md](docs/ARTIFACTS.md) documents the ~1.96 MB portable zip, exact hashes,
+safe export/import, compatibility checks and full-archive requirements.
+
+## Evidence and conclusions
+
+[Consolidated report](runs/v7-evidence-release/REPORT.md) ·
+[Machine-readable catalog](runs/v7-evidence-release/catalog.json) ·
+[Current status and verification](docs/STATUS.md) ·
+[Viewer design](docs/V7.md) · [Interview guide](docs/INTERVIEW.md).
+
+```powershell
+.\.venv\Scripts\python.exe -m battlemind evidence --output runs/MY_FRESH_EVIDENCE
+```
+
+This read-only command recomputes terminal accounting and checks historical file
+hashes. It collects no games and does not weaken historical source audits. It needs
+the full retained archive, which is intentionally excluded from the minimal bundle.
+There is no cross-version win-rate ranking across different populations.
+
+V1/V2 established local play, legal choices, recording and transparent strategy.
+V3 count predictions changed decisions but worsened probability estimates. V4
+improved prediction on its declared mixture; V5 made real outcome-driven updates
+with archived self-play. Neither established better battle results. V6 public
+memory works technically, but **both acceptance attempts remain incomplete**.
+V7 packages these claims; it adds no training or performance experiment and is
+the final planned milestone. Historical commands below are documentation, not
+authorization to repeat consumed experiments.
 
 The central experiment is whether opponent prediction improves the **same** decision-making system. V4 compares a trained classifier with constant and conditional frequencies fitted on the same training rows. Probability quality and battle wins are separate outcomes. See [actual results](docs/STATUS.md) and the preserved [negative V3 findings](docs/MILESTONE3.md).
 
@@ -233,6 +297,11 @@ The schedule traverses unordered team pairs in four-game blocks: both assignment
 .\.venv\Scripts\python.exe -m pytest -q
 .\.venv\Scripts\python.exe -m pytest -q -m integration
 ```
+
+The full integration selection above includes game collection and V4/V5 training
+scenarios; do not run it under V7's consumed functional budget. V7 ran only the
+single new `tests/test_v7_integration.py` game, plus two browser demos. See
+[V7-VERIFICATION.md](docs/V7-VERIFICATION.md) for its predeclared allocation.
 
 Unit tests run offline. Explicit integration tests start and stop the pinned local server on available loopback ports; they preserve real smoke/limit logs under `runs/integration-*`. They also run bounded scenarios inside the official engine to verify Gen 1 requests. These test scenarios are never counted as evaluation games.
 

@@ -1,5 +1,42 @@
 # Player boundary and run records
 
+## V7 viewer and artifact records
+
+V7 adds separate schemas; it does not revise historical observations, commitment
+joins, memory summaries or scientific checkpoint compatibility.
+
+- `v7-public-replay-1`: public protocol lines, normalized side identities, explicit
+  origin/status/outcome, limitations and source hashes. Live data comes from an
+  independent channel-0 guest spectator. Historical exports align the clients'
+  public histories and use only the opposing observer's view for each actor's HP.
+  Missing annotations are not reconstructed from private end logs. A winner/tie
+  is permitted only for a genuine completed game; caps, cleanup and interruptions
+  keep `outcome=null`. Unknown teams remain unrevealed in the display.
+- Explanations are optional post-encounter own-player records: decision ID,
+  snapshot digest, actual numeric scores/probabilities, chosen ID, shadow or
+  initial alternatives and memory digest where recorded. They contain no live
+  snapshot, current opponent choice or private engine data. They never feed play.
+- `v7-demo-bundle-1`: a bounded safe ZIP/JSON closure, exact file hashes, pinned
+  renderer identity, original V4/V5 hashes, source compatibility requirements and
+  provenance. The offline V6 trace contains only the observing player's snapshots,
+  public records, own journal and memory states. It is excluded from HTTP routes,
+  as are models, checkpoints, private logs and source files. Existing model loaders
+  and public memory replay validate import in an isolated temporary directory.
+- `v7-demo-budget-1`: a fresh single-use functional ledger with actual requests,
+  maximum games, aggregate monotonic run seconds, per-run summaries and audits.
+  A full 75-second reservation is required to start; playback consumes zero games.
+  It does not resume or mutate a historical experiment ledger. `service.json`
+  holds a local control token and is never exported in a bundle.
+- `v7-evidence-1`: read-only terminal counts recomputed from retained rows, scope,
+  hashes, populations, phases, scientific reports, issues and audit limitations.
+  Missing/zero-example metrics stay unavailable; planned slots are not requests.
+  Original V6's zero final requests and old timing limitations are explained
+  without rewriting its records. Mixed A/B totals are accounting, not a ranking.
+
+See [V7.md](V7.md) for routing, pacing and projection limits. Integrity against
+retained manifests, semantic replay coverage and current source compatibility are
+reported independently. No historical full-source audit has been weakened.
+
 V2 uses observation schema **1.1**, decision/battle/label schema **2.0**, and accounting summary schema **1.0** with additional fields. V3 keeps that observation and label boundary, adds decision schema **3.0** for prediction decisions, and adds separate dataset/count/probability-report schemas. Legacy policy decisions remain 2.0. Historical V1 logs retain their original schemas and have no verified labels.
 
 All policy-visible values are nested frozen dataclasses containing primitives and tuples. The policy interface is `choose(DecisionSnapshot) -> str`. The adapter alone sees the player's current request. `PublicTracker` sees only messages delivered to that client and applies a small allowlist; it is a protocol projection, not a battle engine. Its mutable records are copied before every decision.

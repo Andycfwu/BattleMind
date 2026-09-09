@@ -1,0 +1,16 @@
+{
+  "schema_version": "v7-functional-verification-1",
+  "purpose": "Functional checks only; no new performance experiment",
+  "maximum_requested_games": 3,
+  "maximum_aggregate_run_seconds": 300,
+  "integration": {"games": 1, "seed": 71901, "agent_a": "learned-score", "agent_b": "max-base-power", "run_seconds": 75},
+  "browser_demos": [
+    {"seed": 71001, "agent_a": "learned-score", "agent_b": "max-base-power", "run_seconds": 75},
+    {"seed": 71002, "agent_a": "gen1-heuristic", "agent_b": "random", "run_seconds": 75}
+  ],
+  "turn_cap": 300,
+  "match_timeout": 60,
+  "concurrency": 1,
+  "predictor_sha256": "44a403e1771cf15f31987a08d31c7856900f04d3fc2eca2c957a23704f04a252",
+  "checkpoint_sha256": "35c2071bf94364bd8812a196091ab06c0d7c1fa994a6e0a4003c23d2ac8bcd6e"
+}

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BattleMind · local battle room</title><link rel="stylesheet" href="/assets/battle.css"><link rel="stylesheet" href="/app.css"></head>
+<body><header><div class="brand">BATTLE<span>MIND</span> <small>LOCAL / GEN 1 OU</small></div><span class="local">● 127.0.0.1 only</span></header>
+<main><section class="intro"><p class="eyebrow">THE BATTLE ROOM</p><h1>Watch the choices.<br>Keep the evidence.</h1><p>Frozen local agents, public battle events, and the limitations that came with them.</p></section>
+<div class="layout"><section class="viewer card"><label for="recording">Recorded evidence & live demos</label><select id="recording"></select>
+<div class="badges"><span id="state">Loading</span><span id="mode">Recorded playback</span><span id="turn">Turn 0</span></div>
+<div class="stage"><div class="battle"></div></div>
+<div class="controls"><button id="play">Play</button><button id="pause">Pause</button><button id="back">← Turn</button><button id="next">Turn →</button><button id="reset">Reset</button>
+<label>Speed <select id="speed"><option value="slow">0.5×</option><option value="normal" selected>1×</option><option value="fast">2×</option><option value="hyperfast">Fast</option></select></label>
+<label>Go to turn <input id="seek" type="number" min="0" max="1000" value="0"></label><button id="go">Go</button></div>
+<p id="detail" class="notice"></p><p id="limitation" class="muted"></p></section>
+<aside><section class="card"><p class="eyebrow">ONE LOCAL GAME</p><h2>Choose two frozen agents</h2><label>Player A<select id="agent-a"></select></label><label>Player B<select id="agent-b"></select></label><button id="launch" class="primary">Run one demo game</button><p id="budget" class="muted"></p><p class="muted">Functional demonstration, not a benchmark. V6 adaptation is shown in chronological recordings; live cross-encounter adaptation is unsupported.</p></section>
+<section class="card evidence"><p class="eyebrow">WHAT THIS DOESN’T PROVE</p><h2>Different choices aren’t counterfactual wins.</h2><p>V3 probability estimates regressed. V4 improved prediction, without established battle benefit. V5 learned policy scores, but improvement was inconclusive. Both V6 acceptance attempts remain incomplete.</p></section></aside></div>
+<div class="bottom"><section class="card"><h2>Public battle log</h2><p class="muted">Announcements show what was observed, not proof that a selected move succeeded.</p><div class="battle-log official-log"></div><details><summary>Public protocol</summary><pre id="public-log"></pre></details></section>
+<section class="card"><h2>Inspect a recorded choice</h2><p class="muted">Optional viewed-player scores, available after the encounter. Approximate utility, never exact damage or fabricated thoughts.</p><button id="explain">Show post-encounter explanation</button><pre id="explanation">Hidden until requested.</pre></section></div>
+<p id="error" role="alert"></p><p id="network-status" class="muted" data-blocked="0">All runtime assets are local. Audio is disabled.</p><footer>Battle mechanics & animation: Pokémon Showdown. Observation boundaries, recording, experiments and this local viewer: BattleMind. Pokémon artwork belongs to its respective owners.</footer></main>
+<script src="/assets/jquery-2.2.4.min.js"></script><script src="/assets/html-sanitizer-minified.js"></script><script src="/assets/data.js"></script><script src="/boot.js"></script><script src="/assets/renderer.js"></script><script src="/app.js"></script></body></html>

@@ -98,6 +98,7 @@ class MatchState:
     turns: int = 0
     tags: set[str] = field(default_factory=set)
     results: dict[str, str] = field(default_factory=dict)
+    spectator: object | None = None
 
     def fail(self, reason: str, detail: str) -> None:
         if self.reason is None:
@@ -140,6 +141,9 @@ class LocalPlayer(Player):
         header = split_messages[0]
         tag = header[0].lstrip(">")
         self.state.tags.add(tag)
+        if self.state.spectator is not None:
+            # Demo observer receives a public room ID only, never this client's messages.
+            self.state.spectator.room(tag, self.state.index)
         tracker = self.trackers.setdefault(tag, PublicTracker())
         try:
             for line in split_messages[1:]:
@@ -232,8 +236,9 @@ async def play_match(config: RunConfig, index: int, decisions: JsonlWriter, even
                      deadline: float, output: Path, engine_logs: Path, labels_log: JsonlWriter,
                      counts: CountTable | PredictorBundle | None = None,
                      checkpoints: dict[str, FrozenCheckpoint] | None = None,
-                     memory_controller: EncounterController | None = None) -> dict:
-    state = MatchState(index, config.turn_cap, decisions, events)
+                     memory_controller: EncounterController | None = None,
+                     spectator=None) -> dict:
+    state = MatchState(index, config.turn_cap, decisions, events, spectator=spectator)
     start = time.monotonic()
     assignments, challenger = scheduled_match(index + config.schedule_offset, len(config.teams))
     seeds = {s: policy_seed(config.seed, index, s) for s in ("a", "b")}
@@ -328,7 +333,7 @@ async def play_match(config: RunConfig, index: int, decisions: JsonlWriter, even
 
 
 async def run(config: RunConfig, output: Path, start_server: bool = False,
-              memory_controller: EncounterController | None = None) -> dict:
+              memory_controller: EncounterController | None = None, spectator=None) -> dict:
     config.validate()
     if memory_controller and config.agent_a != "learned-score":
         raise ValueError("Observer memory requires frozen learned-score player a")
@@ -399,15 +404,19 @@ async def run(config: RunConfig, output: Path, start_server: bool = False,
                 server = await stack.enter_async_context(LocalServer(ROOT / config.showdown, config.port, output / "server.log"))
                 server_pid = server.process.pid
             await healthcheck(config.port)
+            if spectator is not None:
+                await stack.enter_async_context(spectator)
             deadline = started + config.run_timeout
             for index in range(config.battles):
                 if time.monotonic() >= deadline:
                     abort_reason = "Run deadline reached"
                     break
                 log_root = output / "privileged/engine" if start_server else ROOT / config.showdown / "logs"
-                row = await play_match(config, index, decisions, events, deadline, output, log_root, labels_log, counts, checkpoints, memory_controller)
+                row = await play_match(config, index, decisions, events, deadline, output, log_root, labels_log, counts, checkpoints, memory_controller, spectator)
                 battles.write(row)
                 recorded += 1
+                if spectator is not None:
+                    await spectator.terminal(row)
                 print(f"Match {index + 1}/{config.battles}: {row['status']} winner={row['winner']} turns={row['turns']}", flush=True)
                 if row["status"] in {"crash", "cancelled", "timeout"}:
                     abort_reason = row["detail"]

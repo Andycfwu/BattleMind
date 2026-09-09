@@ -62,9 +62,16 @@ The Milestone 2 recorder combines both players' attempts only after the clients 
 | V4. Supervised training from local records — implemented | Logistic regression from audited local recorded battles, train-only preprocessing, whole-battle validation, fair count baselines, safe frozen inference, and separate probability/decision/battle evaluation. No arbitrary replay-file ingestion. |
 | V5. Bounded self-play learning — implemented | Four bounded policy-score parameters, outcome-driven antithetic updates against frozen heuristics and archived checkpoints, separate checkpoint selection and frozen initial/selected evaluation. See V5-EXPERIMENT.md and MILESTONE5.md for the single declared run and actual results. |
 | V6. Individual-opponent adaptation — accounting repaired; acceptance incomplete | Public memory, frozen V4/V5 scoring and accounting regressions pass tests. Original: 96 completed development games, budget exhausted, zero final. Authorized replacement: 144 development completed; final stopped at 251 completed plus one cap caused by the frozen opponent heuristic. No retry or scientific tuning. See V6-ACCEPTANCE-REPAIR.md and STATUS.md for the exact blocker. |
-| V7. Consolidated benchmarks — deferred pending acceptance and a new request | Consolidated reproducible benchmarks and a local watchable battle demonstration of supported V1–V6 claims. Not implemented. Preserve failures and reserve held-out settings before generalization claims. |
+| V7. Evidence and local demonstration — implemented | Read-only retained-evidence catalog, safe local artifact closure, official animated renderer and three bounded functional games. No new performance benchmark. V6 remains incomplete. See V7.md, ARTIFACTS.md and STATUS.md. |
 
-This version roadmap follows the owner's requests and replaces the earlier six-milestone ordering. Prediction affects decisions in V3; supervised fitting begins in V4, policy learning in V5, and public cross-encounter adjustment in V6. **Benchmark every version as it is developed**; V7 consolidates evidence rather than postponing evaluation. `STATUS.md` records acceptance evidence and historical documents preserve earlier findings. V7, external replay ingestion, human profiling, a frontend and a replay viewer are not implemented. Each version should be independently useful.
+This version roadmap follows the owner's requests and replaces the earlier six-milestone ordering. Prediction affects decisions in V3; supervised fitting begins in V4, policy learning in V5, and public cross-encounter adjustment in V6. Each version was evaluated as developed. V7 consolidates retained evidence without a new performance comparison. `STATUS.md` records current verification; historical documents preserve earlier findings. V7 is the final planned milestone. External replay ingestion, human profiling, public hosting and live cross-encounter adaptation in the viewer remain unsupported.
+
+The viewer is a separate consumer: a guest spectator socket receives public engine
+events and a browser animates them with pinned official client components. Playback
+controls have no path to the policy. Historical projections and optional own-player
+explanations are labeled and shown after the encounter. The minimal local bundle
+contains frozen V4/V5 artifacts, public examples and an offline observer-owned V6
+audit prefix; private engine logs and other-player journals are excluded.
 
 ## Prediction experiment and later extensions
 

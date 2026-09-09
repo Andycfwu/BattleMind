@@ -1,5 +1,27 @@
 # BattleMind project rules
 
+- V7 is the final planned milestone: local official animation, safe artifact bundles
+  and read-only evidence consolidation. Read `docs/V7.md`, `docs/ARTIFACTS.md` and
+  `docs/INTERVIEW.md`. Both V6 attempts remain incomplete; the previous status is
+  preserved in `docs/MILESTONE6-REPAIR.md`. Do not start another version or rerun
+  V4/V5/V6 collection without a separate request.
+- V7's three-game functional allocation is consumed: one integration game plus
+  two browser demos, all completed. Recorded UI/bundle/catalog checks collect
+  zero games. Do not run the full integration suite casually: it includes training
+  and self-play scenarios. Preserve `docs/V7-VERIFICATION.md` and all outputs.
+- Keep the viewer spectator-only and local. Pin official renderer/assets and
+  notices; no remote runtime requests. Never serve model files, memory audit
+  inputs, private engine logs, tokens or arbitrary filesystem paths. Explanations
+  are actual own-player post-encounter records, never policy inputs. Live V6
+  adaptation is unsupported; ordered recordings show retained memory instead.
+- Verified V7 commands: `python -m battlemind evidence --output runs/FRESH`,
+  `bundle-verify --bundle runs/v7-release-bundle`, `bundle-export --source BUNDLE
+  --output FRESH.zip`, `bundle-import --source ZIP --output FRESH`, and
+  `scripts/start-demo.ps1 -Bundle runs/v7-release-bundle -Output runs/FRESH -Games 0`.
+  Stop with `scripts/stop-demo.ps1 -Run runs/FRESH`. Use `.venv/Scripts/python.exe`
+  and load `scripts/env.ps1` for all server commands as below. Normal demo defaults
+  permit two bounded games; `-Games 0` is recorded-only verification.
+
 - The user's acceptance-repair request separately authorizes exactly one replacement,
   `runs/v6-acceptance-repair`, under `docs/V6-ACCEPTANCE-REPAIR.md` and
   `configs/v6-acceptance-repair.json`: 144 development / 576 final games,
@@ -71,4 +93,7 @@ Verified PowerShell commands, from project root:
 
 Load `scripts/env.ps1` in each new PowerShell terminal before server commands: the system PATH may select Node 24.20.0, while the pinned bundle is 24.19.0. Keep the version check. Historical V3 uses 144 games/600 seconds. V4's 432-game evidence is in `docs/MILESTONE4.md`, V5's 840-game evidence in `docs/MILESTONE5.md`, and current V6 commands/results in `docs/STATUS.md`. Historical full-source freeze audits require the source manifest that ran; V5 scoring/checkpoint compatibility remains preserved after V6 orchestration extensions. `policy-train` and another `adaptation-run` need a separate request. Never repeat final games just to obtain better outcomes.
 
-Do not replace real-run metrics with fixtures. Report observed counts, failures, actual artifact paths, unsupported behavior, and the one next milestone. Explain code in plain English so the student can defend their own contributions.
+Do not replace real-run metrics with fixtures. Report observed counts, failures,
+actual artifact paths and unsupported behavior. V7 ends the planned roadmap;
+do not invent another milestone. Explain code in plain English so the student
+can defend their own contributions.

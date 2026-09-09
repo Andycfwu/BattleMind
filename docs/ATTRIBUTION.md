@@ -1,5 +1,27 @@
 # Original work and reuse
 
+V7 reuses the official Pokémon Showdown **battle renderer**, pinned to
+[`afa9d4ae645923e42fc8f587080c6bf3d13de2fc`](https://github.com/smogon/pokemon-showdown-client/tree/afa9d4ae645923e42fc8f587080c6bf3d13de2fc).
+The battle components retain their MIT headers. The client repository's AGPL
+license/context is also retained alongside corresponding source, jQuery 2.2.4
+notices and the upstream Caja sanitizer notices. The full account client is not
+loaded. Public Gen 1 display tables come from the pinned official engine; the
+renderer does not calculate battle outcomes. BattleMind's build script adapts
+global-script compilation and local resource prefixes, not game mechanics.
+
+The pinned subset downloads 2,913,473 bytes: renderer source/dependencies/CSS,
+Gen 1 sprites for the fixture species, trainer placeholders and visual effects.
+`configs/viewer-assets.json` lists upstream URLs, sizes and SHA-256 hashes. All
+assets are served locally at runtime; no audio, fonts, full sprite archive, CDN,
+external behavior corpus or replay upload is used. Pokémon artwork/game content
+belongs to its respective owners; it is not BattleMind artwork. See the official
+[sprite repository](https://github.com/smogon/sprites) for attribution context.
+
+V7's project-specific work is the public spectator boundary, conservative historical
+projection, honest terminal display, endpoint restrictions, artifact closure and
+compatibility workflow, evidence consolidation and bounded functional verification.
+The animation is openly attributed upstream, not presented as an original engine.
+
 - [Pokémon Showdown](https://github.com/smogon/pokemon-showdown) supplies all game rules, validation, legal requests, resolution, and outcomes. It is reused under MIT; its license remains in `.local/pokemon-showdown/LICENSE`. BattleMind is a player, not a new simulator.
 - [`poke-env`](https://github.com/hsahovic/poke-env) supplies team packing, network/client orchestration, and request/battle parsing. It is reused under MIT; its installed distribution retains its license. The selected version is in `configs/versions.json`.
 - The maximum-listed-base-power idea appears in the official [`poke-env` quickstart](https://poke-env.readthedocs.io/en/stable/examples/quickstart.html). BattleMind implements it through its own sanitized policy interface and calls it **MaxBasePowerAgent**, with deterministic ties and explicit fallbacks. It is not a novel strategy, a damage estimator, or an imported strong agent.

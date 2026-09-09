@@ -13,6 +13,23 @@ from .runner import RunConfig, run
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description="BattleMind: bounded local gen1ou baseline experiments")
     sub = root.add_subparsers(dest="command", required=True)
+    cmd = sub.add_parser('evidence', help='Read-only consolidation of retained V1-V6 evidence')
+    cmd.add_argument('--output', type=Path, required=True)
+    cmd = sub.add_parser('demo-prepare', help='Package preselected retained public examples and compatible artifacts')
+    cmd.add_argument('--output', type=Path, required=True)
+    for name in ('bundle-export','bundle-import'):
+        cmd = sub.add_parser(name)
+        cmd.add_argument('--source', type=Path, required=True)
+        cmd.add_argument('--output', type=Path, required=True)
+    cmd = sub.add_parser('bundle-verify')
+    cmd.add_argument('--bundle', type=Path, required=True)
+    cmd = sub.add_parser('demo-serve', help='Local viewer; independent bounded functional games only')
+    cmd.add_argument('--bundle', type=Path, required=True)
+    cmd.add_argument('--output', type=Path, required=True)
+    cmd.add_argument('--port', type=int, default=8765)
+    cmd.add_argument('--games', type=int, default=2)
+    cmd.add_argument('--seconds', type=int, default=1800)
+    cmd.add_argument('--recordings', type=Path, help='Finished public replay exports only; never raw/private logs')
     for name in ("doctor", "battle", "server"):
         cmd = sub.add_parser(name)
         cmd.add_argument("--config", type=Path, default=ROOT / "configs/smoke.json")
@@ -84,6 +101,20 @@ def parser() -> argparse.ArgumentParser:
 
 
 async def dispatch(args) -> tuple[dict, int]:
+    if args.command == 'evidence':
+        from .evidence import build_catalog
+        result = build_catalog(args.output)
+        return result, 0 if result['ok'] else 1
+    if args.command in {'demo-prepare','bundle-export','bundle-import','bundle-verify'}:
+        from .demo_bundle import prepare, export_bundle, import_bundle, verify
+        if args.command == 'demo-prepare': result = prepare(args.output)
+        elif args.command == 'bundle-export': result = export_bundle(args.source,args.output)
+        elif args.command == 'bundle-import': result = import_bundle(args.source,args.output)
+        else: result = verify(args.bundle)
+        return result, 0
+    if args.command == 'demo-serve':
+        from .demo_server import serve
+        return await serve(args.bundle,args.output,args.port,args.games,args.seconds,args.recordings), 0
     if args.command == "adaptation-run":
         from .adaptation_experiment import run_adaptation
         result = await run_adaptation(args.output)

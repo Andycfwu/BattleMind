@@ -1,5 +1,15 @@
 # V6: cross-encounter adjustment from public behavior
 
+V7 adds a recorded demonstration, not a new adaptation experiment. Both V6
+attempts remain incomplete; their exact pre-V7 status is preserved in
+[MILESTONE6-REPAIR.md](MILESTONE6-REPAIR.md). The local bundle contains a closed
+four-encounter prefix starting with empty individual memory. Existing replay
+audits reproduce its 98 observer decisions and public memory updates. Thirty-seven
+predictions differ from no memory. Playback cannot update that history; the UI
+shows the reset and chronological cutoff. Live adaptation is unsupported by the
+viewer. See [V7.md](V7.md) and [ARTIFACTS.md](ARTIFACTS.md). No predictor, scoring
+parameter, residual rule, opponent or acceptance result changed in V7.
+
 V6 keeps the supervised predictor from V4 and the selected scoring parameters from
 V5 frozen. It compares no memory, pooled history and individual history. Only the
 historical public summary changes; all three call the same existing V5 scorer.
