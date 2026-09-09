@@ -210,6 +210,76 @@ read-only report show 181.450s including that later overhead. Total experiment
 wall is consistently 181.465s, and final usage is zero. See STATUS for the corrected
 interpretation; no extra games ran during this difference and no ledger was edited.
 
+## V6 acceptance repair accounting (new artifacts only)
+
+The separately authorized replacement uses `v6-budget-2`, `v6-freeze-2` and
+`v6-report-2`. No original ledger, summary or manifest is migrated. The original
+96-game attempt remains development evidence and retains the limitations above.
+The replacement's document/config are `V6-ACCEPTANCE-REPAIR.md` and
+`configs/v6-acceptance-repair.json`; their paths and content hashes enter its freeze.
+Snapshot, memory, proxy, predictor and scoring schemas are unchanged.
+
+New reports expose an `accounting` object at experiment, phase and final-arm scopes:
+
+- `planned_games`: the fixed schedule allocation.
+- `reserved_games`: cells irrevocably admitted within that allocation, without
+  refund. This differs from phase `allocation_reserved_games`, which protects all
+  final capacity before development begins.
+- `requested_games`: reserved games dispatched to the bounded runner. This counts
+  requests to execute a schedule, not a claim that every game reached a challenge.
+- `reserved_not_requested_games`: admitted capacity never dispatched.
+- `never_requested_games`: planned slots not dispatched, including those above.
+- `recorded_games`, `started_games`, `completed_games`: counts from actual terminal
+  rows; explicit `not_started` rows are recorded but neither started nor completed.
+- `never_started_games`: unrequested slots plus explicit not-started rows.
+- `missing_requested_records` / `start_status_unknown_games`: dispatched slots
+  without records. Their start/outcome cannot be guessed, and they never become wins.
+
+For an untouched final arm, planned slots remain visible while requested, completed,
+missing requested records and ordinary outcomes are all zero. Experiment status may
+be failed even when every dispatched game completed. Incomplete cells remain
+ineligible for further memory use or phase progression; no retry or borrowing occurs.
+
+Each phase records monotonic `start_elapsed_seconds`, `stop_elapsed_seconds` and
+`consumed_seconds`. A stop clears the active phase once; repeated finish calls are
+idempotent. Untouched phases have null start/stop and zero duration. Collection stop
+and total finalization are distinct boundaries:
+
+- `timing.collection_stop_elapsed_seconds` freezes when collection ends.
+- `setup_seconds` is collection-stop elapsed minus summed phase durations.
+- `reporting_audit_seconds` measures later reporting, replay and bulk artifact hashing.
+- `overhead_seconds` is setup plus reporting/audit and has its own allocation.
+- `consumed_seconds` is total measured experiment duration. Finalization closes it
+  once; tiny final ledger/summary/manifest writes follow the sample. Later read-only
+  reports neither write the ledger nor extend any recorded duration.
+
+Report audits validate these relationships and actual reservation/dispatch totals.
+Probability intervals require complete independent final groups, as originally
+specified; the existence of rows from a partial fourth group is insufficient.
+Neither estimator nor scientific eligibility changed. Phase budgets cannot be
+borrowed by setup/reporting, even when collection finishes early.
+
+Historical source-freeze audits still require the historical code. Before source
+changes, the original full audit passed for its recorded partial data. After the
+accounting repair, independent replay in `runs/v6-repair-equivalence.json` reproduced
+all 3,643 original decisions/scores/probabilities and 96 memory updates exactly,
+without changing the original files or relaxing their audit checks.
+
+Actual replacement: 396 reserved/dispatched/recorded games, 395 completed, one cap,
+324 unrequested slots. Development is complete; final is not. The experiment's
+report flags and excludes the last incomplete four-game cell from probability and
+memory-summary aggregates while retaining its three completed outcomes and one
+truncation in battle accounting. Consequently those final probability aggregates
+cover 248 games, while final terminal accounting includes 251 completed games.
+`audit.ok=false` and CLI exit 1 preserve incomplete acceptance.
+
+A separate read-only supplemental replay in `runs/v6-repair-verification.json`
+rebuilds all 396 encounters (including the flagged cell) and verifies that cell's
+private labels. Its `ok=true` verifies evidence integrity only; `acceptance_status`
+remains `failed`. The capped encounter has zero admitted evidence and unchanged
+pre/post memory digests. No supplemental result is written back into the frozen
+experiment, relabeled as a draw/win or used to resume collection.
+
 ## Execution evidence and auditing
 
 For each verified intended choice, the recorder examines that client's public history after the frozen snapshot and before its next decision (or the final history). The earlier history must be an exact prefix. `move_announced` means a matching move announcement, **not** that it hit or had an effect. `switch_observed` requires a matching public switch. `prevented_or_engine_wait` records a public `cant` event. `not_announced` means no matching announcement in a completed stream, without guessing why. Incomplete, conflicting or missing evidence stays `unknown`. Event indices preserve the evidence window.

@@ -7,6 +7,7 @@ import random
 import time
 
 from .adaptation import ARMS
+from .adaptation_ledger import request_accounting
 from .dataset import write_json
 from .environment import sha256, source_manifest
 from .labels import audit_labels, read_jsonl
@@ -75,10 +76,14 @@ def label_exclusion(label: dict) -> str | None:
 
 def build_adaptation_report(root: Path, audit: bool = True, write: bool = False, deadline: float | None = None) -> dict:
     from .adaptation_experiment import artifacts, group_schedule, CONFIG, SPEC
+    from .environment import ROOT
     root = root.resolve()
     freeze = json.loads((root / "freeze.json").read_text())
     config = freeze["config"]
     ledger = json.loads((root / "ledger.json").read_text())
+    repaired = ledger["schema_version"] == "v6-budget-2"
+    if freeze["version"] == "v6-freeze-2":
+        CONFIG, SPEC = ROOT / freeze["config_path"], ROOT / freeze["spec_path"]
     bundle, checkpoint = artifacts(root / "predictor.json", root / "checkpoint.json")
     if audit and (freeze["source"] != source_manifest() or sha256(CONFIG) != freeze["config_sha256"] or sha256(SPEC) != freeze["spec_sha256"]
                   or config != json.loads(CONFIG.read_text())):
@@ -97,7 +102,9 @@ def build_adaptation_report(root: Path, audit: bool = True, write: bool = False,
     for record, (phase, planned) in zip(ledger["runs"], expected):
         if deadline is not None and time.monotonic() >= deadline:
             raise TimeoutError("Reserved reporting wall budget exhausted")
-        if any(record.get(k) != v for k, v in planned.items()) or record["phase"] != phase or record["requested_games"] != 4:
+        if (any(record.get(k) != v for k, v in planned.items()) or record["phase"] != phase
+            or record.get("reserved_games", record["requested_games"]) != 4
+            or record["requested_games"] not in ((0, 4) if repaired else (4,))):
             raise ValueError("Encounter schedule changed")
         path = root / record["path"]
         if record["status"] != "recorded":
@@ -156,13 +163,38 @@ def build_adaptation_report(root: Path, audit: bool = True, write: bool = False,
             probabilities.append({**row, "target": label["voluntary_switch_target"], "target_decision_id": label["decision_id"]})
     if partitions != ledger["battle_partitions"]:
         raise ValueError("Recorded phase/group partition mismatch")
+    collection_complete = all(p["status"] == "finished" for p in ledger["phases"].values())
+    if ledger["status"] == "finished" and not collection_complete:
+        raise ValueError("Finished experiment contains an incomplete phase")
     for phase, allocation in ledger["phases"].items():
         requested = sum(r["requested_games"] for r in ledger["runs"] if r["phase"] == phase)
         if requested != allocation["requested_games"] or requested > config["games"][phase]:
             raise ValueError("Reserved phase budget mismatch")
-        if ledger["status"] == "finished" and (requested != config["games"][phase] or allocation["consumed_seconds"] > config["seconds"][phase]):
+        if collection_complete and (requested != config["games"][phase] or allocation["consumed_seconds"] > config["seconds"][phase]):
             raise ValueError("Finished phase incomplete or over budget")
-    if ledger["status"] == "finished":
+        if repaired:
+            records = [r for r in ledger["runs"] if r["phase"] == phase]
+            rows = [r for r in outcomes if r["phase"] == phase]
+            accounting = request_accounting(config["games"][phase], records, rows)
+            if any(allocation[k] != accounting[k] for k in ("reserved_games", "requested_games", "completed_games")):
+                raise ValueError("Phase dispatch/completion accounting differs from recorded evidence")
+            start, stop = allocation["start_elapsed_seconds"], allocation["stop_elapsed_seconds"]
+            if ((start is None) != (stop is None) or (start is None and allocation["consumed_seconds"] != 0)
+                or (start is not None and (stop < start or abs(stop - start - allocation["consumed_seconds"]) > 1e-6))):
+                raise ValueError("Stopped phase clock is inconsistent")
+    if repaired:
+        if ledger["reserved_games"] != sum(r["reserved_games"] for r in ledger["runs"]):
+            raise ValueError("Aggregate cell reservations differ")
+        timing = ledger["timing"]
+        phase_seconds = sum(p["consumed_seconds"] for p in ledger["phases"].values())
+        if abs(timing["collection_stop_elapsed_seconds"] - phase_seconds - timing["setup_seconds"]) > 1e-6:
+            raise ValueError("Collection/phase/setup clock mismatch")
+        if timing["finalized"]:
+            if (abs(ledger["consumed_seconds"] - timing["collection_stop_elapsed_seconds"] - timing["reporting_audit_seconds"]) > 1e-6
+                or abs(timing["overhead_seconds"] - timing["setup_seconds"] - timing["reporting_audit_seconds"]) > 1e-6
+                or (ledger["status"] == "finished" and timing["overhead_seconds"] > ledger["overhead_allocated_seconds"])):
+                raise ValueError("Final reporting/overhead clock mismatch")
+    if collection_complete:
         resets = [{"phase": phase, "group": group, "observers": [digest(["v6-observer", phase, group, arm])[:24] for arm in ARMS],
                    "all_empty": True} for phase in ("development", "final") for group in range(config["groups"][phase])]
         final = json.loads((root / "final-freeze.json").read_text())
@@ -180,7 +212,9 @@ def build_adaptation_report(root: Path, audit: bool = True, write: bool = False,
         updates = [r for r in all_updates if r["phase"] == phase]
         admitted = [r for r in decisions if r["proxy"] is not None]
         eligible_admitted = [r for r in rows if r["proxy"] is not None]
-        phase_reports[phase] = {**ledger["phases"][phase], "outcomes": outcome_metrics([r for r in outcomes if r["phase"] == phase],
+        phase_reports[phase] = {**ledger["phases"][phase], "accounting": request_accounting(config["games"][phase],
+            [r for r in ledger["runs"] if r["phase"] == phase], [r for r in outcomes if r["phase"] == phase]),
+            "outcomes": outcome_metrics([r for r in outcomes if r["phase"] == phase],
                 ledger["phases"][phase]["requested_games"]), "probability_metrics": metrics(rows),
             "eligible_examples": len(rows), "switches": sum(r["target"] for r in rows), "exclusions": dict(exclusions[phase]),
             "public_evidence": {"encounters": len(updates), "supported_encounters": sum(r["update_eligible"] for r in updates),
@@ -194,17 +228,30 @@ def build_adaptation_report(root: Path, audit: bool = True, write: bool = False,
                     "maximum": max((r["support"][a] for r in decisions), default=0)} for a in ARMS[1:]}},
             "same_snapshot_choice_differences": {f"{a}_minus_{b}": sum(r["choices"][a] != r["choices"][b] for r in decisions)
                 for a, b in COMPARISONS}, "observer_decisions": len(decisions)}
+    complete_groups = [g for g in range(config["groups"]["final"]) if
+        sum(r["status"] == "completed" for r in final_games if r["group"] == g) ==
+        sum(4 for p, cell in expected if p == "final" and cell["group"] == g)]
+    def differences(rows):
+        # The original specification requires complete independent groups.
+        return probability_differences(rows if len(complete_groups) >= 4 else [])
     groups = {}
     for field in ("arm", "target_policy", "cold_start", "individual_fallback", "group"):
         groups[field] = {str(key): {"metrics": metrics([r for r in final_probs if r[field] == key]),
-            "differences": probability_differences([r for r in final_probs if r[field] == key])}
+            "differences": differences([r for r in final_probs if r[field] == key])}
             for key in sorted({r[field] for r in final_probs})}
     groups["arm_by_target"] = {f"{arm}/{target}": metrics([r for r in final_probs if r["arm"] == arm and r["target_policy"] == target])
         for arm in ARMS for target in config["targets"]}
-    live = {arm: {"overall": outcome_metrics([r for r in final_games if r["arm"] == arm], config["games"]["final"] // 3),
-        "by_target": {t: outcome_metrics([r for r in final_games if r["arm"] == arm and r["target_policy"] == t], config["games"]["final"] // 6) for t in config["targets"]},
-        "by_group": {str(g): outcome_metrics([r for r in final_games if r["arm"] == arm and r["group"] == g], 48) for g in range(config["groups"]["final"])}}
-        for arm in ARMS}
+    def live_scope(arm, target=None, group=None):
+        def matches(r):
+            return r["arm"] == arm and (target is None or r.get("target_policy", r.get("target")) == target) and (group is None or r["group"] == group)
+        rows = [r for r in final_games if matches(r)]
+        records = [r for r in ledger["runs"] if r["phase"] == "final" and matches(r)]
+        planned = sum(4 for p, cell in expected if p == "final" and matches(cell))
+        accounting = request_accounting(planned, records, rows)
+        return {**outcome_metrics(rows, accounting["requested_games"]), "accounting": accounting}
+    live = {arm: {"overall": live_scope(arm),
+        "by_target": {t: live_scope(arm, target=t) for t in config["targets"]},
+        "by_group": {str(g): live_scope(arm, group=g) for g in range(config["groups"]["final"])}} for arm in ARMS}
     live_differences = {}
     for a, b in COMPARISONS:
         result = {}
@@ -227,10 +274,12 @@ def build_adaptation_report(root: Path, audit: bool = True, write: bool = False,
     hashes = json.loads((root / "artifact-hashes.json").read_text()) if (root / "artifact-hashes.json").exists() else {}
     if audit and any(sha256(root / p) != h for p, h in hashes.items()):
         raise ValueError("V6 artifact hash mismatch")
-    report = {"version": "v6-report-1", "status": ledger["status"], "failure": ledger["failure"],
+    report = {"version": "v6-report-2" if repaired else "v6-report-1", "status": ledger["status"], "failure": ledger["failure"],
         "requested_games": ledger["requested_games"], "consumed_seconds": ledger["consumed_seconds"],
+        "accounting": request_accounting(config["total_games"], ledger["runs"], outcomes),
+        **({"timing": ledger["timing"]} if repaired else {}),
         "phases": phase_reports, "final_probability": {"metrics": metrics(final_probs), "groups": groups,
-            "differences": probability_differences(final_probs)}, "final_battles": live, "battle_differences": live_differences,
+            "differences": differences(final_probs)}, "final_battles": live, "battle_differences": live_differences,
         "labels": labels, "warnings": warnings, "resources": resources, "predictor_sha256": bundle.sha256,
         "checkpoint_sha256": checkpoint.sha256, "audit": {"ok": not unverified, "public_decisions": len(all_decisions),
             "encounters": len(all_updates), "private_audited_cells": audit_count, "overlapping_battles": 0,

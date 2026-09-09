@@ -6,13 +6,19 @@ The central experiment is whether opponent prediction improves the **same** deci
 
 ## V6 public opponent memory
 
-**Implemented and tested; full acceptance is incomplete.** The single declared run
-stopped at its development budget after **96/96 requested games completed**, with
-zero battle failures or invalid actions. It did not finish the 144-game development
-schedule and launched **zero final games**. Individual memory reduced development
-Brier error but this partial, one-group result does not establish a final benefit.
-The unused final allocation was preserved; no retry or budget expansion occurred.
-See [STATUS.md](docs/STATUS.md) for actual results and timing/reporting limitations.
+**Accounting repaired and tested; acceptance remains incomplete.** The separately
+authorized replacement completed **144 development games**, then stopped with
+**251 completed final games, one turn cap and 324 never-requested final slots**.
+The frozen switch-active heuristic repeatedly chose an engine action with a frozen
+active Pokémon despite a legal healthy replacement. It hit the unchanged 300-turn
+cap. No retry or opponent/cap tuning occurred. Partial probability losses improved
+overall, but battle benefit remains inconclusive.
+
+The original attempt remains unchanged: **96 completed development games;
+development budget exhausted; zero final games**. Its status is preserved in
+[MILESTONE6-FIRST-ATTEMPT.md](docs/MILESTONE6-FIRST-ATTEMPT.md). Neither attempt is
+called complete. [STATUS.md](docs/STATUS.md) records both, the exact blocker, tests,
+hashes, resource use and the limited interpretation of partial final results.
 
 V6 preserves the original V4 predictor and selected V5 scoring checkpoint. It
 compares no memory, pooled history and individual history using the **same scoring
@@ -20,30 +26,36 @@ code and parameters**. Each arm uses only its own earlier completed encounters;
 memory is frozen within a battle. Public announcements are a conservative proxy,
 with forced, ambiguous, engine and missing evidence retained as exclusions.
 
-[V6-EXPERIMENT.md](docs/V6-EXPERIMENT.md) specifies 144 development and 576 final
-games, 900 seconds maximum, four fresh final reset groups, two unchanged target
-policies and four unchanged teams. It is one single-use experiment: no retry,
-resume, borrowing final budget, new self-play training or final-result tuning.
+[V6-EXPERIMENT.md](docs/V6-EXPERIMENT.md) is the unchanged original specification.
+The separate [acceptance repair](docs/V6-ACCEPTANCE-REPAIR.md) preserves its science
+and 144/576-game schedule, with authorized 420/1,080-second phases plus 300 seconds
+overhead. Phase clocks stop once; planned/reserved/requested/started/completed games
+are distinct. Both specifications are single-use: no retry, resume, budget borrowing,
+self-play training or final-result tuning. The replacement used 868.72 seconds
+including separately measured read-only verification; its stop was a cap, not time.
 
 ```powershell
 . .\scripts\env.ps1
-# Actual one-time collection command already run; stopped on development budget:
-.\.venv\Scripts\python.exe -m battlemind adaptation-run --output runs/v6-acceptance
+# Actual replacement command already run once; allocation is now consumed:
+.\.venv\Scripts\python.exe -u -m battlemind adaptation-run --specification repair --output runs/v6-acceptance-repair
 # Read-only replay of memory, shadow predictions, choices and private label audits:
-.\.venv\Scripts\python.exe -m battlemind adaptation-report --experiment runs/v6-acceptance --audit
+.\.venv\Scripts\python.exe -m battlemind adaptation-report --experiment runs/v6-acceptance-repair --audit
 ```
 
-Do not rerun collection: this output is consumed, resume is unsupported, and a
-separate request is required for another experiment. The read-only audit verifies
-1,064 artifact files and 96 encounter replays, while returning exit code 1 because
-the overall experiment is incomplete. `audit.ok` does not mean acceptance passed.
+Do not rerun collection: both outputs are consumed and resume is unsupported.
+The replacement CLI returns exit code 1 and flags its incomplete cell. Its 4,364
+artifact hashes match; supplemental public/private audits verify even the capped
+cell's retained evidence without making that cell acceptance-eligible. Original
+files and their older accounting limitations were not rewritten. Historical full
+source-freeze audits require the original code; their checks were not weakened.
 
 Collection output must be new. Required retained inputs are `models/v4-supervised.json`
 and `runs/v5-acceptance/selected.json`; missing or incompatible files stop before
 collection. Their exact hashes, regeneration limitations and code explanation are
 in [ADAPTATION.md](docs/ADAPTATION.md). A source-only clone does not contain these
 ignored artifacts. V5 evidence is preserved in [MILESTONE5.md](docs/MILESTONE5.md).
-The four planned final groups would give limited uncertainty evidence; none ran.
+The replacement has only one complete final group and one partial group. Group
+uncertainty is unavailable; no turn-level interval substitutes for missing groups.
 Adaptation is not assumed to improve either probability quality or wins.
 
 ## V5 bounded policy learning

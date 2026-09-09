@@ -218,9 +218,10 @@ def test_budget_reservation_exhaustion_and_no_resume(tmp_path):
         ledger.begin("final")
     ledger.begin("development")
     i = ledger.reserve({"group": 0}, 4)
+    ledger.dispatch(i)
     with pytest.raises(ValueError):
         ledger.reserve({}, 1)
-    ledger.record(i, "hash", [{"match": n} for n in range(4)], {})
+    ledger.record(i, "hash", [{"match": n, "status": "completed"} for n in range(4)], {})
     ledger.finish_phase()
     ledger.begin("final")
     now[0] = 21

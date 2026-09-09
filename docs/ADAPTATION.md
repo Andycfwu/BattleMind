@@ -4,8 +4,10 @@ V6 keeps the supervised predictor from V4 and the selected scoring parameters fr
 V5 frozen. It compares no memory, pooled history and individual history. Only the
 historical public summary changes; all three call the same existing V5 scorer.
 The [experiment specification](V6-EXPERIMENT.md) fixes rules and budgets before
-reported games. [STATUS.md](STATUS.md) records the actual **budget-stopped** result:
-96 completed development games, no final evaluation, and acceptance incomplete.
+reported games. The first attempt stopped on budget after 96 development games and
+no final games. Its separately authorized accounting repair/replacement also remains
+incomplete: 144 development games, then 251 completed final games and one cap.
+[STATUS.md](STATUS.md) records both preserved attempts and the exact remaining blocker.
 
 ## Required retained artifacts
 
@@ -171,3 +173,51 @@ compatibility, preservation and all artifact-hash checks. No source/specificatio
 was changed after collection to obtain a different result. Failed-phase clock
 finalization and the planned-denominator final grid have presentation limitations
 documented in SCHEMA/STATUS; use actual phase requests and the reported stop time.
+
+## Separately authorized acceptance repair
+
+The first attempt remains exactly: **96 completed development games; development
+budget exhausted; zero final games**. Its original status is preserved in
+[MILESTONE6-FIRST-ATTEMPT.md](MILESTONE6-FIRST-ATTEMPT.md), SHA-256
+`3f3a1a3057578a7d3ad3aa7aa93fe9a7cfca9950842404a106e6d65f52212163`.
+It is not resumed or included in replacement final metrics.
+
+[V6-ACCEPTANCE-REPAIR.md](V6-ACCEPTANCE-REPAIR.md) authorizes one replacement with
+the same 144-development/576-final schedule and 420/1,080/300-second phase/overhead
+allocations (1,800 seconds total). Required inputs, public rules, shrinkage, support,
+arms, targets, teams, seeds, ordering, resets, eligibility and estimators stay frozen.
+`validate_repair_config()` rejects scientific changes and checks original source
+outside the four accounting/CLI files. The schedule and metric functions also pass
+source comparisons. Replaying the original 96 games under the repair reproduces
+probabilities, memory digests, candidate scores and choices exactly.
+
+The accounting change closes a phase clock once, then measures reporting separately.
+Reservations consume capacity before launch; only dispatching a cell counts as a
+request to the runner. Reports distinguish never-requested allocations, explicit
+not-started rows and missing requested records. Empty final arms therefore have zero
+actual requests and zero missing requested outcomes. Read-only reporting cannot
+mutate elapsed times. SCHEMA documents the versioned fields and historical caveats.
+
+Infrastructure is unchanged: one server lifecycle per four games, all original
+preflight/source checks, warning handling, private audits and public replays, one
+battle at a time on 127.0.0.1. No shared-server optimization, safety caching, model
+training or opponent tuning was introduced. Existing timings projected 249 seconds
+for development and 994 for final; the first budget of 180 seconds was insufficient.
+The replacement still has limited final timing margin and must stop on failure.
+
+Before replacement collection, 133 unit and 10 selected integration tests passed.
+The 37 test games are separate: prior checks plus 12 explicitly test-only games
+through development and two fresh final reset groups. The new test exercised real
+memory updates, final gating, complete report/hash output and read-only replay.
+It does not substitute its reduced schedule for acceptance. V4 refitting and V5
+self-play integration scenarios were excluded from this repair's game collection.
+
+The replacement stopped on the unchanged 300-turn cap in final group 1. Both actives
+were frozen; the fixed switch-active heuristic assigned its legal healthy switch
+-1000 versus the engine action's 0. The capped encounter made no memory update and
+was neither a win nor a draw. No opponent or adaptation rule was changed in response.
+Only one independent final group completed, so four-group acceptance and uncertainty
+remain unavailable. Partial final Brier was .083232/.083774/.073545 for none/pooled/
+individual, but individual switch-active log loss was worse than both controls.
+This preserves a weak result and a strategy limitation without claiming a successful
+confirmation. Detailed counts, audits and artifacts are recorded separately in STATUS.

@@ -1,0 +1,55 @@
+{
+  "schema_version": "v6-acceptance-repair-1",
+  "arms": [
+    "none",
+    "pooled",
+    "individual"
+  ],
+  "targets": [
+    "max-base-power",
+    "switch-active"
+  ],
+  "teams": [
+    "configs/teams/ou-v1-a.txt",
+    "configs/teams/ou-v1-b.txt",
+    "configs/teams/ou-v2-c.txt",
+    "configs/teams/ou-v2-d.txt"
+  ],
+  "groups": {
+    "development": 1,
+    "final": 4
+  },
+  "games": {
+    "development": 144,
+    "final": 576
+  },
+  "seconds": {
+    "development": 420,
+    "final": 1080
+  },
+  "total_games": 720,
+  "total_seconds": 1800,
+  "cell_games": 4,
+  "turn_cap": 300,
+  "match_timeout": 60,
+  "policy_seed_base": 61000,
+  "bootstrap_seed": 61901,
+  "memory": {
+    "prior_encounters": 8,
+    "minimum_encounters": 2,
+    "minimum_examples": 4,
+    "maximum_adjustment": 0.15,
+    "probability_floor": 0.01
+  },
+  "predictor_sha256": "44a403e1771cf15f31987a08d31c7856900f04d3fc2eca2c957a23704f04a252",
+  "checkpoint_sha256": "35c2071bf94364bd8812a196091ab06c0d7c1fa994a6e0a4003c23d2ac8bcd6e",
+  "overhead_seconds": 300,
+  "original_experiment": {
+    "path": "runs/v6-acceptance",
+    "artifact_manifest_sha256": "52c22392d9cf6be514afb4c5ebaf71977dbdc17227658fb8172dfc178a02151c",
+    "spec_sha256": "07a73b4311ad630a317c90ae52de2ad6cd4229a8235a5287126d1f36f1a1ce3d",
+    "config_sha256": "a777ade5904f669161603fe0ca760913c6e131c080883fffd85e45c31e1b22b6",
+    "source_commit": "e64f26e",
+    "historical_status_sha256": "3f3a1a3057578a7d3ad3aa7aa93fe9a7cfca9950842404a106e6d65f52212163"
+  }
+}

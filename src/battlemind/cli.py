@@ -73,7 +73,9 @@ def parser() -> argparse.ArgumentParser:
     cmd = sub.add_parser("policy-report", help="Read or fully audit a retained learning experiment; no games/updates")
     cmd.add_argument("--experiment", type=Path, required=True)
     cmd.add_argument("--audit", action="store_true")
-    cmd = sub.add_parser("adaptation-run", help="Single-use bounded V6 public-memory experiment")
+    cmd = sub.add_parser("adaptation-run", help="The separately authorized single-use V6 acceptance repair")
+    cmd.add_argument("--specification", choices=("repair",), required=True,
+        help="Explicit replacement specification; the original consumed experiment cannot resume")
     cmd.add_argument("--output", type=Path, required=True)
     cmd = sub.add_parser("adaptation-report", help="Read or replay-audit a V6 experiment; no games")
     cmd.add_argument("--experiment", type=Path, required=True)

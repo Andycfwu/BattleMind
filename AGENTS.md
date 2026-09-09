@@ -1,12 +1,24 @@
 # BattleMind project rules
 
-- V6 acceptance is **incomplete**, not passed: `runs/v6-acceptance` stopped on the
+- The user's acceptance-repair request separately authorizes exactly one replacement,
+  `runs/v6-acceptance-repair`, under `docs/V6-ACCEPTANCE-REPAIR.md` and
+  `configs/v6-acceptance-repair.json`: 144 development / 576 final games,
+  420s / 1,080s phases and 300s overhead, 1,800s total. Do not tune scientific rules,
+  retrain or change opponents. Do not resume the original or retry this replacement.
+  Read STATUS for its actual outcome before further work. Source/report repairs
+  preserve original scientific modules and must reproduce retained snapshots.
+  That authorization is now consumed: development completed 144/144; final stopped
+  at 251 completed plus one cap, with 324 never requested. The fixed switch-active
+  heuristic stalled with a frozen active despite a healthy legal switch. Do not
+  change opponents/caps/rules or run another replacement without a new request.
+
+- The original V6 attempt is **incomplete**, not passed: `runs/v6-acceptance` stopped on the
   180-second development allocation after 96 completed games; final requested zero.
   Do not resume, retry, borrow its final allocation or run a replacement without a
   new request. Public replay/hash audits passed for the recorded partial evidence.
   Read STATUS for the failed-phase timing and planned-final-denominator limitations.
 
-- Read `README.md`, `docs/STATUS.md`, `docs/PROJECT.md`, `docs/PREDICTION.md`, `docs/SCHEMA.md`, `docs/POLICY-LEARNING.md`, `docs/V5-EXPERIMENT.md`, `docs/ADAPTATION.md` and `docs/V6-EXPERIMENT.md` before extending work. V1–V6 include frozen prediction, bounded policy learning and cross-encounter synthetic-opponent memory. Do not add external replay ingestion, human profiling, a frontend, additional training or another adaptation experiment without a new request. Preserve historical evidence in `docs/MILESTONE3.md`, `docs/MILESTONE4.md` and `docs/MILESTONE5.md`.
+- Read `README.md`, `docs/STATUS.md`, `docs/PROJECT.md`, `docs/PREDICTION.md`, `docs/SCHEMA.md`, `docs/POLICY-LEARNING.md`, `docs/V5-EXPERIMENT.md`, `docs/ADAPTATION.md`, `docs/V6-EXPERIMENT.md` and `docs/V6-ACCEPTANCE-REPAIR.md` before extending work. V1–V6 include frozen prediction, bounded policy learning and cross-encounter synthetic-opponent memory. Do not add external replay ingestion, human profiling, a frontend, additional training or another adaptation experiment without a new request. Preserve historical evidence in `docs/MILESTONE3.md`, `docs/MILESTONE4.md`, `docs/MILESTONE5.md` and `docs/MILESTONE6-FIRST-ATTEMPT.md`.
 - Inspect the directory and any Git changes before editing. Preserve unrelated work. Do not commit, push, deploy, or launch extended workloads without the user's request.
 - All battles and services stay on `127.0.0.1`. Never use the public ladder, external authentication, cloud accounts, tunnels, hosted models, or paid APIs. Do not relax the reviewed server binding.
 - Keep concurrency 1 and bounded battle/turn/time budgets. Never count cleanup forfeits, failures, or caps as wins.

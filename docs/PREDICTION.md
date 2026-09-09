@@ -214,3 +214,11 @@ on its development budget after 96 completed games; no final games ran. Explorat
 shadow Brier scores were .083013 without memory, .084411 pooled and .072807 individual
 on the same 2,222 eligible snapshots. These partial, one-group development results
 do not establish final improvement. [STATUS.md](STATUS.md) records the limitations.
+
+The separately authorized accounting repair preserved all scientific source and
+reproduced the original 3,643 decisions exactly. Its replacement completed development
+but stopped during final on a frozen-opponent turn cap. Partial final Brier scores
+were .083232/.083774/.073545 for none/pooled/individual; switch-active log loss was
+worse with individual memory. One complete final group is insufficient for the
+declared four-group comparison. No predictor, scorer, memory rule or opponent was
+tuned, and no replacement retry occurred. See V6-ACCEPTANCE-REPAIR.md and STATUS.

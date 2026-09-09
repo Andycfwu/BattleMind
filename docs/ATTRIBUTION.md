@@ -43,3 +43,10 @@ memory summaries, opaque routing outside features, frozen common V4/V5 scorer,
 same-snapshot shadow comparison, chronological reconstruction and persistent phase
 budgets. No human profiles or external behavior data are used. The partial V6
 development result is retained with its budget stop; final benefit is unverified.
+
+The V6 acceptance repair changes bookkeeping and reports, not the adaptation
+algorithm. It separates stopped phase clocks from reporting and planned/reserved
+capacity from dispatched requests. The authorized replacement exposed a cap caused
+by the frozen heuristic's handling of a frozen active Pokémon; it was not retuned
+or rerun. Preserving that failure and distinguishing partial evidence from completed
+acceptance are part of the project's reproducibility work, not claims of strength.

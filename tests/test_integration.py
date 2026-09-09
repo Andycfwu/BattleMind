@@ -298,3 +298,48 @@ def test_v6_real_public_encounter_memory_replay_and_privileged_independence(tmp_
     assert replay_cell(copied, ObserverMemory(), bundle, checkpoint) == replay_cell(root / "encounters-0", ObserverMemory(), bundle, checkpoint)
     with pytest.raises(ValueError):
         audit_labels(copied)
+
+
+def test_v6_repair_real_development_final_resets_complete_report(monkeypatch):
+    """12 test games through the actual phase driver, never acceptance evidence."""
+    from battlemind import adaptation_experiment as experiment
+    from battlemind.adaptation_report import build_adaptation_report
+    from battlemind.environment import sha256
+
+    root = ROOT / "runs" / ("integration-v6-repair-" + uuid.uuid4().hex[:10])
+    root.mkdir()
+    config = json.loads(experiment.REPAIR_CONFIG.read_text())
+    config.update(schema_version="v6-repair-test-only-12", groups={"development": 1, "final": 2},
+        games={"development": 4, "final": 8}, seconds={"development": 120, "final": 120},
+        total_games=12, total_seconds=300, overhead_seconds=60)
+    spec_path, config_path = root / "TEST-ONLY.md", root / "test-config.json"
+    spec_path.write_text("Test-only 12 games. Not acceptance or performance evidence.\n")
+    config_path.write_text(json.dumps(config, indent=2))
+    original_schedule = experiment.group_schedule
+
+    def test_schedule(c, phase, group):
+        return (cell for cell in original_schedule(c, phase, group)
+            if cell["pair"] == 0 and cell["arm"] == "individual" and cell["target"] == "max-base-power")
+
+    monkeypatch.setattr(experiment, "group_schedule", test_schedule)
+    output = root / "experiment"
+    result = asyncio.run(experiment._run_specification(output, config, config_path, spec_path))
+    assert result["status"] == "finished", result
+    assert result["accounting"]["requested_games"] == result["accounting"]["completed_games"] == 12
+    assert result["phases"]["development"]["accounting"]["completed_games"] == 4
+    assert result["phases"]["final"]["accounting"]["completed_games"] == 8
+    assert result["audit"]["reset_groups"] == 3 and result["audit"]["ok"]
+    for phase, group in (("development", 0), ("final", 0), ("final", 1)):
+        path = output / phase / f"g{group}/individual-p0-vs-max-base-power"
+        first = json.loads((path / "memory/000-before.json").read_text())
+        assert first["ordinal"] == 0
+        assert first["pre_context"]["pooled"]["encounters"] == first["pre_context"]["individual"]["encounters"] == 0
+    rows = read_rows(output / "shadow-predictions.jsonl")
+    assert any(r["phase"] == "final" and r["probabilities"]["individual"] != r["probabilities"]["none"] for r in rows)
+    ledger_hash = sha256(output / "ledger.json")
+    replay = build_adaptation_report(output, audit=True)
+    assert replay["audit"]["ok"] and replay["audit"]["artifact_files"] > 0
+    assert replay["timing"] == result["timing"] and replay["accounting"] == result["accounting"]
+    assert sha256(output / "ledger.json") == ledger_hash
+    with pytest.raises(ValueError, match="fresh"):
+        asyncio.run(experiment._run_specification(output, config, config_path, spec_path))

@@ -3,6 +3,7 @@
 from dataclasses import asdict
 import json
 from pathlib import Path
+import time
 
 from .adaptation import ARMS
 from .adaptation_ledger import AdaptationLedger
@@ -19,6 +20,8 @@ CONFIG = ROOT / "configs/v6-experiment.json"
 SPEC = ROOT / "docs/V6-EXPERIMENT.md"
 PREDICTOR = ROOT / "models/v4-supervised.json"
 CHECKPOINT = ROOT / "runs/v5-acceptance/selected.json"
+REPAIR_CONFIG = ROOT / "configs/v6-acceptance-repair.json"
+REPAIR_SPEC = ROOT / "docs/V6-ACCEPTANCE-REPAIR.md"
 
 
 def artifacts(predictor=PREDICTOR, checkpoint=CHECKPOINT):
@@ -49,30 +52,58 @@ def group_schedule(config: dict, phase: str, group: int):
                     "path": f"{phase}/g{group}/{arm}-p{pair}-vs-{target}"}
 
 
+def validate_repair_config(config: dict):
+    original = json.loads(CONFIG.read_text())
+    allowed = {"schema_version", "seconds", "total_seconds", "overhead_seconds", "original_experiment"}
+    if ({k: v for k, v in config.items() if k not in allowed} !=
+        {k: v for k, v in original.items() if k not in allowed}
+        or config["schema_version"] != "v6-acceptance-repair-1"
+        or config["seconds"] != {"development": 420, "final": 1080}
+        or config["total_seconds"] != 1800 or config["overhead_seconds"] != 300):
+        raise ValueError("Replacement may change accounting/allocations only")
+    reference = config["original_experiment"]
+    for path, key in ((CONFIG, "config_sha256"), (SPEC, "spec_sha256"),
+        (ROOT / reference["path"] / "artifact-hashes.json", "artifact_manifest_sha256"),
+        (ROOT / "docs/MILESTONE6-FIRST-ATTEMPT.md", "historical_status_sha256")):
+        if sha256(path) != reference[key]:
+            raise ValueError("Original V6 evidence/specification changed")
+    original_source = json.loads((ROOT / reference["path"] / "freeze.json").read_text())["source"]
+    accounting_files = {f"src/battlemind/{name}.py" for name in
+        ("adaptation_ledger", "adaptation_report", "adaptation_experiment", "cli")}
+    if any(sha256(ROOT / path) != value for path, value in original_source.items() if path not in accounting_files):
+        raise ValueError("Original scientific/runtime source changed")
+    if config["memory"] != {"prior_encounters": PRIOR, "minimum_encounters": MIN_ENCOUNTERS,
+        "minimum_examples": MIN_EXAMPLES, "maximum_adjustment": MAX_ADJUSTMENT, "probability_floor": FLOOR}:
+        raise ValueError("Memory rules differ from the frozen configuration")
+
+
 async def run_adaptation(output: Path) -> dict:
+    config = json.loads(REPAIR_CONFIG.read_text())
+    validate_repair_config(config)
+    return await _run_specification(output, config, REPAIR_CONFIG, REPAIR_SPEC)
+
+
+async def _run_specification(output: Path, config: dict, config_path: Path, spec_path: Path) -> dict:
+    """Shared phase machinery; smaller specifications are injected only by tests."""
+    started = time.monotonic()
     output = output.resolve()
     if output.exists():
         raise ValueError("V6 output must be fresh; resume/retry is unsupported")
     bundle, checkpoint = artifacts()
-    config = json.loads(CONFIG.read_text())
-    if (config["groups"] != {"development": 1, "final": 4} or config["games"] != {"development": 144, "final": 576}
-        or config["targets"] != ["max-base-power", "switch-active"] or config["cell_games"] != 4
-        or tuple(config["arms"]) != ARMS or len(config["teams"]) != 4
-        or config["memory"] != {"prior_encounters": PRIOR, "minimum_encounters": MIN_ENCOUNTERS,
-            "minimum_examples": MIN_EXAMPLES, "maximum_adjustment": MAX_ADJUSTMENT, "probability_floor": FLOOR}):
-        raise ValueError("Unsupported V6 specification")
     output.mkdir(parents=True)
-    ledger = AdaptationLedger(output, config)
+    ledger = AdaptationLedger(output, config, started=started)
     (output / "predictor.json").write_bytes(PREDICTOR.read_bytes())
     (output / "checkpoint.json").write_bytes(CHECKPOINT.read_bytes())
-    freeze = {"version": "v6-freeze-1", "config": config, "config_sha256": sha256(CONFIG),
-        "spec_sha256": sha256(SPEC), "source": source_manifest(), "predictor_sha256": bundle.sha256,
+    freeze = {"version": "v6-freeze-2", "config": config, "config_sha256": sha256(config_path),
+        "config_path": config_path.resolve().relative_to(ROOT).as_posix(),
+        "spec_path": spec_path.resolve().relative_to(ROOT).as_posix(),
+        "spec_sha256": sha256(spec_path), "source": source_manifest(), "predictor_sha256": bundle.sha256,
         "checkpoint_sha256": checkpoint.sha256, "parameters": asdict(checkpoint.parameters)}
     write_json(output / "freeze.json", freeze)
 
     def verify():
-        if (source_manifest() != freeze["source"] or sha256(SPEC) != freeze["spec_sha256"]
-            or sha256(CONFIG) != freeze["config_sha256"]):
+        if (source_manifest() != freeze["source"] or sha256(spec_path) != freeze["spec_sha256"]
+            or sha256(config_path) != freeze["config_sha256"]):
             raise ValueError("Frozen V6 source/specification changed")
         artifacts(output / "predictor.json", output / "checkpoint.json")
         artifacts()
@@ -100,6 +131,7 @@ async def run_adaptation(output: Path) -> dict:
                         predictor=str(output / "predictor.json"), checkpoint_a=str(output / "checkpoint.json"),
                         turn_cap=config["turn_cap"], timeout=config["match_timeout"], run_timeout=min(600, ledger.remaining() - 10))
                     print(f"{cell['path']}: 4 games", flush=True)
+                    ledger.dispatch(index)  # Reservation alone is not a request to execute games.
                     result = await run(run_config, output / cell["path"], start_server=True, memory_controller=controller)
                     battles = read_jsonl(output / cell["path"] / "battles.jsonl")
                     ledger.record(index, sha256(output / cell["path"] / "run.json"), battles, result)
@@ -120,7 +152,8 @@ async def run_adaptation(output: Path) -> dict:
         ledger.finish(failure)
     from .adaptation_report import build_adaptation_report
     try:
-        summary = build_adaptation_report(output, audit=True, write=True, deadline=ledger.started + config["total_seconds"] - 5)
+        deadline = min(ledger.started + config["total_seconds"], time.monotonic() + ledger.overhead_remaining()) - 5
+        summary = build_adaptation_report(output, audit=True, write=True, deadline=deadline)
     except Exception as error:
         failure = failure or f"Report/audit: {type(error).__name__}: {error}"
         from .adaptation_report import outcome_metrics
@@ -133,14 +166,12 @@ async def run_adaptation(output: Path) -> dict:
         summary = {"version": "v6-report-1", "audit_error": failure, "audit": {"ok": False},
             "outcomes": outcome_metrics(rows, ledger.state["requested_games"]),
             "unreadable_runs": unreadable, "phase_budgets": ledger.state["phases"]}
-    ledger.finish(failure)
-    summary.update(status=ledger.state["status"], failure=ledger.state["failure"],
-        requested_games=ledger.state["requested_games"], consumed_seconds=ledger.state["consumed_seconds"])
-    write_json(output / "summary.json", summary)
     hashes = {p.relative_to(output).as_posix(): sha256(p) for p in sorted(output.rglob("*")) if p.is_file()}
-    ledger.finish(failure)  # Include artifact hashing in the consumed wall budget.
-    summary.update(status=ledger.state["status"], failure=ledger.state["failure"], consumed_seconds=ledger.state["consumed_seconds"])
-    (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    ledger.finalize(failure)  # Includes bulk hashing; tiny final manifest/ledger writes follow.
+    summary.update(status=ledger.state["status"], failure=ledger.state["failure"],
+        requested_games=ledger.state["requested_games"], consumed_seconds=ledger.state["consumed_seconds"],
+        timing=ledger.state["timing"])
+    write_json(output / "summary.json", summary)
     hashes.update({name: sha256(output / name) for name in ("ledger.json", "summary.json")})
     write_json(output / "artifact-hashes.json", hashes)
     return summary
