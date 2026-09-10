@@ -139,12 +139,32 @@ def save_checkpoint(path: Path, parameters: Parameters, provenance: dict) -> Che
     return load_checkpoint(path)
 
 
+def _compatible_checkpoint(recorded: dict) -> bool:
+    current=json.loads(json.dumps(compatibility()))
+    if recorded==current:
+        return True
+    # Only the reviewed validation-only source revision may read original v1
+    # artifacts. Every other source/feature/runtime field must still match.
+    profile=json.loads((ROOT/'configs/reinforce-loader-compatibility.json').read_text())
+    original=profile['original_checkpoint_compatibility']
+    repaired=json.loads(json.dumps(original))
+    repaired['source_hashes']['reinforce.py']=profile['repaired_reinforce_sha256']
+    return recorded==original and current==repaired
+
+
 def load_checkpoint(path: Path) -> Checkpoint:
     if path.stat().st_size>1_000_000: raise ValueError('Oversized policy checkpoint')
     data=json.loads(path.read_text())
     if set(data)!={'schema_version','compatibility','actor','value','provenance'} or data['schema_version']!='reinforce-checkpoint-1':
         raise ValueError('Unsupported policy checkpoint')
-    if data['compatibility']!=json.loads(json.dumps(compatibility())): raise ValueError('Incompatible policy features/source')
+    if not _compatible_checkpoint(data['compatibility']): raise ValueError('Incompatible policy features/source')
+    if (not isinstance(data['actor'],list) or not all(isinstance(row,list) for row in data['actor'])
+        or not isinstance(data['value'],list)):
+        raise ValueError('Checkpoint coefficients must be numeric arrays')
+    # Do not let NumPy's float coercion validate strings/bools that remain in
+    # the immutable tuples and then fail (or change meaning) during inference.
+    if any(type(v) not in (int,float) for row in [*data['actor'],data['value']] for v in row):
+        raise ValueError('Checkpoint coefficients must be JSON numbers')
     return Checkpoint(Parameters(tuple(tuple(r) for r in data['actor']),tuple(data['value'])),sha256(path))
 
 

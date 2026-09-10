@@ -290,9 +290,15 @@ def build_report(root,ledger,config):
                     if row['player']!='a':continue
                     obs=snapshot_from_dict(row['observation'])
                     pi,*_=distribution(obs,initial.parameters);ps,*_=distribution(obs,selected.parameters)
-                    draw=row['policy_evaluation']['draw']
-                    ai=min(int(np.searchsorted(np.cumsum(pi),draw)),len(pi)-1)
-                    az=min(int(np.searchsorted(np.cumsum(ps),draw)),len(ps)-1)
+                    evaluation=row.get('policy_evaluation')
+                    if not isinstance(evaluation,dict) or 'draw' not in evaluation:
+                        raise ValueError('Missing recorded policy draw for '+row['decision_id'])
+                    draw=evaluation['draw']
+                    if type(draw) not in (int,float) or not np.isfinite(draw) or not 0<=draw<1:
+                        raise ValueError('Invalid recorded policy draw for '+row['decision_id'])
+                    # Match ReinforceAgent.act at exact CDF boundaries too.
+                    ai=min(int(np.searchsorted(np.cumsum(pi),draw,side='right')),len(pi)-1)
+                    az=min(int(np.searchsorted(np.cumsum(ps),draw,side='right')),len(ps)-1)
                     differences['argmax_changed']+=int(pi.argmax()!=ps.argmax());differences['shared_draw_changed']+=int(ai!=az)
                     comparisons+=1
                     stream.write(json.dumps({'run_id':record['run_id'],'decision_id':row['decision_id'],'snapshot_sha256':row['snapshot_sha256'],

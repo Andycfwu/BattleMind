@@ -12,6 +12,17 @@ its primary control; it is not presented as equivalent to V5. See the
 [actual research results](docs/REINFORCE-RESULTS.md). Historical V1–V7 evidence,
 viewer defaults and the **incomplete V6 acceptance status** remain unchanged.
 
+The [REINFORCE loader/reporting repair note](docs/REINFORCE-REPAIRS.md) documents
+the two audit fixes, strict historical compatibility and offline replay checks.
+
+The separately authorized [controlled actor-step experiment](docs/ACTOR-STEP-RESULTS.md)
+completed **2,088/2,088 games**. A 10× actor-only step produced much greater
+policy movement without numerical instability, but **did not establish better
+final results** than the fresh control or initialization. The
+[frozen specification](docs/ACTOR-STEP-EXPERIMENT.md) and ignored
+`runs/actor-step-acceptance` retain both arms, all 12 updates, selection and audits.
+Its allocation is consumed; no further training is authorized by these commands.
+
 ## Watch a battle
 
 This retained workspace already has the verified demonstration bundle:

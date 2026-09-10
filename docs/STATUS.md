@@ -1,4 +1,45 @@
-# BattleMind — richer policy research completed, benefit inconclusive
+# BattleMind — controlled actor-step experiment completed, benefit inconclusive
+
+The one authorized actor-step contrast completed **2,088 requested/completed games**:
+864 training, 360 fresh selection and 864 final. Both conditions made six real
+outcome-driven updates. The actor-only treatment preserved gradient averaging,
+norm clipping, value updates, features, sampling and episode admission. Offline
+tests reproduce the original control update exactly and verify 10× actor steps
+with identical value updates on identical inputs.
+
+Fresh selection chose **control c3** and **treatment c6**. Each final arm completed
+288 games: initialization **158W/122L/8D**, control **167W/119L/2D**, treatment
+**165W/118L/5D**. Treatment-minus-control mean R is **−0.00347**, descriptive 95%
+four-game-block interval **[−0.10773, 0.10069]**. Treatment-minus-initial is +0.03819,
+interval [−0.08342, 0.16667]. Neither establishes improvement or reliable regression.
+
+On 30,876 identical final snapshots, mean TV from initialization is **0.00345
+control versus 0.04003 treatment**; common-draw action differences are 0.78% versus
+7.39%. Greater movement is established for these retained inputs; better battle
+play is not. There were no numerical failures, clipping/projection activations,
+caps, invalid actions, timeouts, crashes or missing games. Training excluded
+35/432 control and 39/432 treatment episodes for unknown commitments; no top-ups.
+
+The full audit reproduced **105,393 decisions**, all **12 updates**, selection,
+and 2,088 disjoint identities. All 256 offline tests passed; 14 integrations were
+deselected. No extra test games ran. The process used 1,263.96s including reports,
+audit and hashing; the separate preservation/independent-snapshot closure used
+72.78s. These and offline preparation remain within the protected wall allocations.
+
+[Results, actual commands, hashes and limitations](ACTOR-STEP-RESULTS.md) ·
+[Frozen specification](ACTOR-STEP-EXPERIMENT.md) ·
+[Run summary](../runs/actor-step-acceptance/summary.json) ·
+[Verification](../runs/actor-step-verification/closure.json).
+
+Original policies, models, repairs, reports, viewer defaults and all V1–V7 evidence
+remain preserved. **Neither V6 acceptance attempt passed.** No second actor-step
+attempt or additional rate was run. The single recommended next action is a
+separately scoped offline validation of the sampled-command trajectory contract
+before reconsidering the structured whole-episode exclusions. It was not executed.
+
+The historical REINFORCE status follows unchanged.
+
+# Historical: richer policy research completed, benefit inconclusive
 
 The separately authorized extension after V1–V7 is implemented and its bounded
 experiment and audits finished. `reinforce` is an 851-parameter, action-conditioned

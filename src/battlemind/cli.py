@@ -13,6 +13,12 @@ from .runner import RunConfig, run
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description="BattleMind: bounded local gen1ou baseline experiments")
     sub = root.add_subparsers(dest="command", required=True)
+    cmd = sub.add_parser('actor-step-run', help='One frozen controlled actor-step experiment; no resume')
+    cmd.add_argument('--spec', type=Path, required=True)
+    cmd.add_argument('--output', type=Path, required=True)
+    cmd = sub.add_parser('actor-step-report', help='Read-only controlled actor-step outcomes and update replay')
+    cmd.add_argument('--experiment', type=Path, required=True)
+    cmd.add_argument('--audit', action='store_true')
     cmd = sub.add_parser('reinforce-run', help='Single-use bounded research extension: smoke or frozen main specification')
     cmd.add_argument('--spec', type=Path, required=True)
     cmd.add_argument('--output', type=Path, required=True)
@@ -108,6 +114,14 @@ def parser() -> argparse.ArgumentParser:
 
 
 async def dispatch(args) -> tuple[dict, int]:
+    if args.command == 'actor-step-run':
+        from .actor_step_experiment import experiment
+        result=await experiment(args.spec,args.output)
+        return result, 0 if result['status']=='finished' else 1
+    if args.command == 'actor-step-report':
+        from .actor_step_experiment import report_experiment
+        result=report_experiment(args.experiment,args.audit)
+        return result, 0 if result['audit']['ok'] else 1
     if args.command == 'reinforce-run':
         from .reinforce_experiment import experiment
         result=await experiment(args.spec,args.output)
