@@ -1,0 +1,64 @@
+{
+  "concurrency": 1,
+  "host": "127.0.0.1",
+  "format": "gen1ou",
+  "turn_cap": 300,
+  "game_timeout_seconds": 60,
+  "reserve_all_phases_before_collection": true,
+  "resume": false,
+  "retries": false,
+  "borrow_allocations": false,
+  "training_updates": false,
+  "eligibility_changes": false,
+  "teams": [
+    "configs/teams/ou-v1-a.txt",
+    "configs/teams/ou-v1-b.txt",
+    "configs/teams/ou-v2-c.txt",
+    "configs/teams/ou-v2-d.txt"
+  ],
+  "policies": [
+    "reinforce-original-c0",
+    "random"
+  ],
+  "policy_seed": 260911,
+  "simulator_seed_matched": false,
+  "checkpoint": "runs/reinforce-main/checkpoints/c0.json",
+  "checkpoint_sha256": "f7734489bce5d74ce2dedffd8ab274a8483810a03e09b48a26ea0ebf28d44287",
+  "upstream_commit": "2f5b273925862ac242b419086c1e7a8868b51da1",
+  "minimum_live_coverage": [
+    "ordinary_move",
+    "voluntary_switch",
+    "forced_replacement",
+    "wrap_continuation",
+    "clamp_continuation",
+    "gen1_fight"
+  ],
+  "stop_rules": [
+    "phase_or_aggregate_budget",
+    "unexpected_protocol_warning_or_error",
+    "nonfinite_inference",
+    "recording_integrity_failure",
+    "information_leakage",
+    "failed_cleanup"
+  ],
+  "ordinary_cap": "retain without reward; next independent game only after verified cleanup",
+  "schema": "bm-acceptance-instrumented-spec-1",
+  "status": "authorized_single_use",
+  "purpose": "Functional recording separately from normalization coverage",
+  "maximum_games": 24,
+  "maximum_wall_seconds": 420,
+  "phase_seconds": {
+    "preflight": 100,
+    "instrumented": 240,
+    "reporting": 60
+  },
+  "cleanup_seconds": 20,
+  "output": "runs/acceptance-instrumented-only-1",
+  "derived": ".local/pokemon-showdown-acceptance-v2-r5",
+  "reference": "runs/acceptance-live-verification-replacement-1/original",
+  "instrumented_build_id": "b2b0a1b1bdc30749a38e3c6ae3beea27ea03387d75dda0afe4e7ba7051d1b19a",
+  "input_manifest": "configs/acceptance-instrumented-only-inputs.json",
+  "input_manifest_sha256": "9740fb6c49a15c4d8337e8ab80ab1d130b0bdcd3f4e1b5a603f6965df53acee0",
+  "schedule": "scheduled_match(0..23,4); no original-engine games",
+  "coverage_failure": "partial coverage; no extra games; functional recording judged separately"
+}
